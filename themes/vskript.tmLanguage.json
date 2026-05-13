@@ -1,5 +1,5 @@
 {
-	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"$schema": "../.vscode/tmlanguage.schema.json",
 	"name": "VSkript",
 	"scopeName": "source.sk",	
 	"patterns": [
@@ -101,12 +101,12 @@
 			"patterns": [ { "patterns": [ { "include": "#sentence" } ] } ]
 		},
 		{
-			"_comment": "Skript Event Section",
-			"begin": "^(?:(?:on|every)(?: +(?:[^\\:]*)\\:)?|at(?: +(?:\\d{1,2}\\:\\d{1,2})?\\:)?)",
-			"end": "(?=^(?!(\\#|\\t| |$)))",
-			"beginCaptures": { "0": { "name": "vskript.event" } },
-			"patterns": [ { "patterns": [ { "include": "#sentence" } ] } ]
-		},
+            "_comment": "Skript Event Section",
+            "begin": "^(?:(?:on|every) +)?\\b(any move|armor change|bed enter|bed leave|block damage|break|bucket empty|bucket fill|burn|chat|chunk generate|chunk load|chunk unload|click|combust|command|connect|consume|craft|creeper power|damage|death|dispense|drop|eat|enchant|enchant prepare|enderman escape|enderman place|explosion|explosion prime|fade|firework explode|fish|flow|form|fuse|gamemode change|grow|heal|hunger bar change|ignite|item spawn|join|jump|kick|kill|leaf decay|level change|lightning strike|loot generate|mine|move|offhand switch|piston extend|piston retract|place|plugin disable|plugin enable|portal|portal create|portal enter|pressure plate|pickup|projectile hit|projectile launch|quit|ready|recipe unlock|redstone|respawn|resource pack response|riptide|server start|server stop|shear|shoot|sign change|smelt|sneak|spawn|spawn change|sprint|stay|swap hand items|tab complete|tame|target|teleport|throw|tool change|toggle glide|toggle sneak|toggle sprint|transform|un-ignite|vehicle create|vehicle damage|vehicle destroy|vehicle enter|vehicle exit|vehicle move|vulnerability|weather change|world init|world load|world save|world unload|zap)(?=\\:| )",
+            "end": "(?=^(?!(\\#|\\t| |$)))",
+            "beginCaptures": { "0": { "name": "vskript.event" } },
+            "patterns": [ { "patterns": [ { "include": "#sentence" } ] } ]
+        },
 		{ "include": "#reflect" }
 	],
 
