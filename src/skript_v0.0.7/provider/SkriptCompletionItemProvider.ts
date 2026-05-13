@@ -1,19 +1,24 @@
-import { CompletionItemProvider, CompletionItem, TextDocument, CompletionItemKind, SnippetString, CancellationToken, CompletionContext, Position, IndentAction } from 'vscode'
-import * as Skript from '../Skript'
+import { CompletionItemProvider, CompletionItem, TextDocument, CompletionItemKind, SnippetString, CancellationToken, CompletionContext, Position } from 'vscode';
+import * as Skript from '../Skript';
 import { SkriptCommand, SkriptFunction, SkriptParagraphComponent } from '../SkriptComponent';
 import { Materials as SkriptMaterials } from '../language/Materials';
-import { resourceLimits } from 'node:worker_threads';
 
-const ITEMS_MAP = new Map<string,CompletionItem[]>();
-
-
+/**
+ * 1. 기본 키워드 및 최신 이벤트 리스트 업데이트
+ */
 const Components = (() => {
     let list = new Array<CompletionItem>();
-    [   {isKeyword: true, name:'aliases', snippet:'aliases:\r\n\t'},
+    [   
+        // 기존 항목
+        {isKeyword: true, name:'aliases', snippet:'aliases:\r\n\t'},
         {isKeyword: true, name:'options', snippet:'options:\r\n\t'},
         {isKeyword: true, name:'command', snippet:'command /${1:label} ${2:arguments}:\r\n\ttrigger:\r\n\t\t'},
         {isKeyword: true, name:'function', snippet:'function ${1:name}(${2:parameters}) :: ${3:return type}:\r\n\t'},
-        {isKeyword: false, name:'function void', snippet:'function ${1:name}(${2:parameters}):\r\n\t'}
+        {isKeyword: false, name:'function void', snippet:'function ${1:name}(${2:parameters}):\r\n\t'},
+        // 우리가 추가한 최신 이벤트들
+        {isKeyword: true, name:'on portal create', snippet:'on portal create:\r\n\t${1:# code}'},
+        {isKeyword: true, name:'on tool change', snippet:'on tool change:\r\n\t${1:# code}'},
+        {isKeyword: true, name:'on zap', snippet:'on zap:\r\n\t${1:# code}'}
     ].forEach(value => {
         if (value.isKeyword)
             list.push(new CompletionItem(value.name, CompletionItemKind.Keyword));
@@ -43,33 +48,24 @@ const CMD_Options = (() =>{
         list.push(snippet);
     })
     return list;
-})() ;
+})();
 
-
-
-/**
- * ```Ctrl + space``` 단축키로 completion을 연다.
- * ***
- * completion을 열 때 동작한다.  
- * resolveCompletionItem는 목록을 스크롤할 때 동작한다.  
- */
 export class SkriptCompletionItemProvider implements CompletionItemProvider<CompletionItem> {
     provideCompletionItems(document: TextDocument, position: Position, _token: CancellationToken, _context: CompletionContext ): CompletionItem[] | undefined {
 
         let result = new Array<CompletionItem>();
-
         let line = document.lineAt(position.line);
         let range = document.getWordRangeAtPosition(position);
         let word: string | undefined = (range) ? document.getText(range) : undefined;
 
         let skDocument = Skript.find(document.uri.fsPath)!;
 
-        // 첫 입력 (keyword)
+        // 1. 첫 입력 (Keyword/Events)
         if (!skDocument.componentOf(position) && (line.text === '' || line.text.indexOf(word!) === 0)) {
             return Components;
         }
 
-        // 메터리얼 입력
+        // 2. 마인크래프트 아이템/메터리얼 입력
         let matrial_range = document.getWordRangeAtPosition(position, /minecraft:\w*/i);
         let matrial_word: string | undefined = (matrial_range) ? document.getText(matrial_range) : undefined;
         if (matrial_word) {
@@ -78,24 +74,21 @@ export class SkriptCompletionItemProvider implements CompletionItemProvider<Comp
             }
         }
 
-        // Component
+        // 3. 구문 내부(Paragraph) 자동완성 (함수 수집 포함)
         let subText = line.text.substring(0, position.character);
         let skComponent = skDocument.componentOf(position, {isBefore:true});
         if (skComponent) {
 
             // Command Options
-            if (skComponent instanceof SkriptCommand
-                && subText.match(/^(\t|\s{4})($|[^\t\s\:]*$)/)) {
-                    
-                    let items = Object.assign(CMD_Options, {});
-                    if (skComponent.options) for (const option of skComponent.options) {
-                        items = items.filter(v => v.label !== option.key);  
-                    }
-                    result.push(...items);
-                    // return items;
+            if (skComponent instanceof SkriptCommand && subText.match(/^(\t|\s{4})($|[^\t\s\:]*$)/)) {
+                let items = Object.assign(CMD_Options, {});
+                if (skComponent.options) for (const option of skComponent.options) {
+                    items = items.filter(v => v.label !== option.key);  
+                }
+                result.push(...items);
             }
 
-            // Grobal Functions
+            // 전역 함수 자동완성 (서버 내 모든 로드된 파일 기준)
             if (skComponent instanceof SkriptParagraphComponent && skComponent.paragraph.range.contains(position)) {
                 for (const skDocs of Skript.DOCUMENTS) {
                     let isThis = skDocs === skDocument;
@@ -108,9 +101,9 @@ export class SkriptCompletionItemProvider implements CompletionItemProvider<Comp
                         if (skFunc.parameters) for (const skParam of skFunc.parameters) {
                             let i = parameters.length + 1;
                             if (skParam.type.isList) {
-                                parameters.push(`\${${i}:{_${skParam.name}::*\\\}}`)
+                                parameters.push(`\${${i}:{_${skParam.name}::*\\}}`)
                             } else {
-                                parameters.push(`\${${i}:{_${skParam.name}\\\}}`)
+                                parameters.push(`\${${i}:{_${skParam.name}\\}}`)
                             }
                         }
                         item.insertText = new SnippetString(`${skFunc.name}( ${parameters.join(', ')} )`)
@@ -118,56 +111,7 @@ export class SkriptCompletionItemProvider implements CompletionItemProvider<Comp
                     }
                 }
             }
-
-
         }
-
         return result;
-    }/*,
-
-    resolveCompletionItem(item: CompletionItem, token: CancellationToken): CompletionItem {
-        return item;
-    }*/
-
-    // private _updateFunctionCompletionItem(skFile:SkriptFile): CompletionItem[] {
-    //     let items = this._createCompletionItemsInFile(skFile);
-    //     ITEMS_MAP.set(skFile.fsPath, items);
-    //     return items;
-    // }
-
-    // private _createCompletionItemsInFile(skFile:SkriptFile): CompletionItem[] {
-    //     let items = new Array<CompletionItem>();
-    //     for (let comp of skFile.components) if (comp instanceof SkriptFunction) {
-    //         // item
-    //         let item = new CompletionItem(comp.name, CompletionItemKind.Function);
-    //         item.detail = skFile.skName;
-
-    //         // insert
-    //         let paramList = new Array<string>();
-    //         let i = 1;
-    //         for (const p of comp.parameters) {
-    //             let param = '${' + i++ + '|\{_' + p.name + '\}|}';
-    //             paramList.push(param);
-    //         }
-    //         item.insertText = new SnippetString(comp.name + '( ' + paramList.join(', ') + ' )');
-
-    //         // docs
-    //         // let docs = new Array<string>();
-    //         // if (comp.docs) {
-    //         //     for (const info of comp.docs!)
-    //         //         docs.push(info.replace(/(^|\b)(\@\w*)($|\b)/i, '_$2_'));
-    //         //     docs.push('***');
-    //         // }
-    //         // docs.push(skFile.skName!);
-    //         // item.documentation = new MarkdownString(docs.join('  \r\n'));
-    //         item.documentation = comp.markdown;
-
-    //         items.push(item);
-    //     }
-    //     return items;
-    // }
+    }
 }
-
-
-
-    

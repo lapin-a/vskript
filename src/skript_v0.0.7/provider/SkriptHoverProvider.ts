@@ -1,4 +1,4 @@
-import { create } from 'node:domain';
+import { create } from 'domain';
 import { Hover, HoverProvider, MarkdownString, Position, Range, TextDocument, Uri } from 'vscode'
 import * as Skript from "../Skript"
 import { SkriptFunction, SkriptOptions, SkriptAliases } from '../SkriptComponent';

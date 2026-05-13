@@ -1,130 +1,115 @@
-import { DocumentSymbol, DocumentSymbolProvider, SymbolKind, TextDocument } from 'vscode';
+import { DocumentSymbol, DocumentSymbolProvider, SymbolKind, TextDocument, Range } from 'vscode';
 import * as Skript from '../Skript';
 import { SkriptVariable, SkriptVariableKind } from '../language/SkriptExpressions';
 import { SkriptAliases, SkriptOptions, SkriptCommand, SkriptEvent, SkriptFunction } from '../SkriptComponent';
 
-const SYMBOLS_MAP = new Map<string,DocumentSymbol[]>();
+// 파일별 심볼 캐시 저장소
+const SYMBOLS_MAP = new Map<string, DocumentSymbol[]>();
 
-/**
- * ```Ctrl + Shift + O``` 단축키로 바로 갈 수 있는 기능  
- * ```Ctrl + Shift + .``` 단축키로 바로 갈 수 있는 기능  
- * 옵션, 별칭, 명령어, 이벤트, 함수, 변수 등을 반환한다.   
- * ***
- * ActiveDocument를 변경할때 동작한다.  
- * TextDocument의 변화가 생기면 동작한다.  
- */
 export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
-    provideDocumentSymbols(document: TextDocument /*token: CancellationToken*/) {
-
+    provideDocumentSymbols(document: TextDocument) {
         let fsPath = document.uri.fsPath;
-        if (!SYMBOLS_MAP.has(fsPath) || document.isDirty) {
 
+        // 문서가 변경되었거나 캐시가 없으면 새로 생성
+        if (!SYMBOLS_MAP.has(fsPath) || document.isDirty) {
             let symbols: DocumentSymbol[] = [];
-            SYMBOLS_MAP.set(fsPath, symbols);
-        
             let skDocument = Skript.find(fsPath);
-            if (!skDocument)
-                return
             
-            // Aliases
+            if (!skDocument) return [];
+
+            // 1. Aliases (아이콘: Enum/Struct)
             for (const skAliases of skDocument.getComponents(SkriptAliases)) {
-                let aliasesSymbol = new DocumentSymbol(skAliases.title, '', skAliases.symbolKind, skAliases.range, skAliases.range);
+                let aliasesSymbol = new DocumentSymbol(skAliases.title || 'Aliases', '', SymbolKind.Struct, skAliases.range, skAliases.range);
                 symbols.push(aliasesSymbol);
 
                 for (const aliases of skAliases.aliases) {
                     let value = Object.assign(aliases.value, {}).map(v => v.replace('minecraft:', '')).join(', ');
-                    let optionSymbol = new DocumentSymbol(aliases.key, value, SymbolKind.Enum, aliases.range, aliases.range);
-                    aliasesSymbol.children.push(optionSymbol);
+                    aliasesSymbol.children.push(new DocumentSymbol(aliases.key, value, SymbolKind.EnumMember, aliases.range, aliases.range));
                 }
-
             }
 
-            // Options
+            // 2. Options (아이콘: Interface/Constant)
             for (const skOptions of skDocument.getComponents(SkriptOptions)) {
-                let optionsSymbol = new DocumentSymbol(skOptions.title, '', skOptions.symbolKind, skOptions.range, skOptions.range);
+                let optionsSymbol = new DocumentSymbol(skOptions.title || 'Options', '', SymbolKind.Interface, skOptions.range, skOptions.range);
                 symbols.push(optionsSymbol);
 
                 for (const option of skOptions.options) {
-                    let optionSymbol = new DocumentSymbol(option.key, option.value, SymbolKind.Enum, option.range, option.range);
-                    optionsSymbol.children.push(optionSymbol);
+                    optionsSymbol.children.push(new DocumentSymbol(option.key, option.value, SymbolKind.Constant, option.range, option.range));
                 }
-
             }
 
-            // Command
+            // 3. Command (아이콘: Function/Event)
             for (const skCommand of skDocument.getComponents(SkriptCommand)) {
-                let commandSymbol = new DocumentSymbol(skCommand.title, '', skCommand.symbolKind, skCommand.range, skCommand.range);
+                let commandSymbol = new DocumentSymbol(`/${skCommand.title}`, 'Command', SymbolKind.Event, skCommand.range, skCommand.range);
                 symbols.push(commandSymbol);
 
                 if (skCommand.options) for (const option of skCommand.options) {
-                    let optionSymbol = new DocumentSymbol(option.key, option.value, SymbolKind.Enum, option.range, option.range);
+                    let kind = option.key === 'trigger' ? SymbolKind.Method : SymbolKind.Property;
+                    let optionSymbol = new DocumentSymbol(option.key, option.value, kind, option.range, option.range);
                     commandSymbol.children.push(optionSymbol);
 
-                    if (option.key === 'trigger') {
+                    if (option.key === 'trigger' && skCommand.paragraph) {
                         optionSymbol.children.push(...this._createVariableSymbols(skCommand.paragraph.variables));
                     }
                 }
-
             }
 
-            // Event
+            // 4. Event (아이콘: Boolean/Event)
             for (const skEvent of skDocument.getComponents(SkriptEvent)) {
-                let eventSymbol = new DocumentSymbol(skEvent.title, '', skEvent.symbolKind, skEvent.range, skEvent.range);
-                eventSymbol.children.push(...this._createVariableSymbols(skEvent.paragraph.variables));
+                let eventSymbol = new DocumentSymbol(skEvent.title, 'Event', SymbolKind.Boolean, skEvent.range, skEvent.range);
+                if (skEvent.paragraph) {
+                    eventSymbol.children.push(...this._createVariableSymbols(skEvent.paragraph.variables));
+                }
                 symbols.push(eventSymbol);
             }
 
-            // Function
+            // 5. Function (아이콘: Function)
             for (const skFunction of skDocument.getComponents(SkriptFunction)) {
-                let functionSymbol = new DocumentSymbol(skFunction.title, '', skFunction.symbolKind, skFunction.range, skFunction.range);
-                functionSymbol.children.push(...this._createVariableSymbols(skFunction.paragraph.variables));
+                let functionSymbol = new DocumentSymbol(`${skFunction.title}()`, 'Function', SymbolKind.Function, skFunction.range, skFunction.range);
+                if (skFunction.paragraph) {
+                    functionSymbol.children.push(...this._createVariableSymbols(skFunction.paragraph.variables));
+                }
                 symbols.push(functionSymbol);
             }
-            
-            return symbols;
 
+            SYMBOLS_MAP.set(fsPath, symbols);
+            return symbols;
         } else {
-            let response = SYMBOLS_MAP.get(fsPath);
-            return response;
+            return SYMBOLS_MAP.get(fsPath);
         }
     }
 
-    private _createVariableSymbols(skVariables:SkriptVariable[]): DocumentSymbol[] {
+    // 로컬 변수들을 심볼로 변환하는 유틸리티
+    private _createVariableSymbols(skVariables: SkriptVariable[]): DocumentSymbol[] {
         let result: DocumentSymbol[] = [];
-        let maps = new Map<string, {variable:SkriptVariable, amount: number}>();
+        let maps = new Map<string, { variable: SkriptVariable, amount: number }>();
 
-        for (const variables of skVariables)
-            for (const skVariable of this._getAllVariable(variables))
+        for (const variables of skVariables) {
+            for (const skVariable of this._getAllVariable(variables)) {
                 if (skVariable.kind === SkriptVariableKind.LOCAL) {
-            let value
-            if (value = maps.get(skVariable.raw)) {
-                value.amount += 1;
-            } else {
-                maps.set(skVariable.raw, {variable:skVariable, amount:1});
+                    let existing = maps.get(skVariable.raw);
+                    if (existing) {
+                        existing.amount += 1;
+                    } else {
+                        maps.set(skVariable.raw, { variable: skVariable, amount: 1 });
+                    }
+                }
             }
         }
 
-        for (const key of maps.keys()) {
-            let value = maps.get(key)!
-            let variable = value.variable;
-            let amount = value.amount;
-            let variableSymbol = new DocumentSymbol(key, `used ${amount} times`, SymbolKind.Variable, variable.range, variable.range);
-            result.push(variableSymbol);
+        for (const [key, value] of maps) {
+            result.push(new DocumentSymbol(key, `used ${value.amount} times`, SymbolKind.Variable, value.variable.range, value.variable.range));
         }
 
         return result;
     }
 
-    private _getAllVariable(skVariable:SkriptVariable): SkriptVariable[] {
-        if (skVariable.child.length === 0) {
-            return [skVariable]
-        } else {
-            let array: SkriptVariable[] = [];
-            for (const child of skVariable.child) {
-                array.push(skVariable, ...this._getAllVariable(child));
-            }
-            return array;
+    private _getAllVariable(skVariable: SkriptVariable): SkriptVariable[] {
+        if (skVariable.child.length === 0) return [skVariable];
+        let array: SkriptVariable[] = [skVariable];
+        for (const child of skVariable.child) {
+            array.push(...this._getAllVariable(child));
         }
+        return array;
     }
-
 }
