@@ -210,5 +210,30 @@
         "body": [
             "${TM_CURRENT_LINE/(.*)//}teleport ${1:%entities%} to ${2:%location%}"
         ],
+        
+    },
+    "Event Tool Change": {
+        "prefix": [ "on tool change" ],
+        "body": [
+            "on tool change:",
+            "\t${1:# code}"
+        ],
+        "description": "연장이 바뀔 때 실행되는 이벤트입니다."
+    },
+    "Event Zap": {
+        "prefix": [ "on zap" ],
+        "body": [
+            "on zap:",
+            "\t${1:# code}"
+        ],
+        "description": "번개에 맞았을 때 실행되는 이벤트입니다."
+    },
+    "Event Portal Create": {
+        "prefix": [ "on portal create" ],
+        "body": [
+            "on portal create:",
+            "\t${1:# code}"
+        ],
+        "description": "포탈이 생성될 때 실행되는 이벤트입니다."
     }
 }
