@@ -129,11 +129,14 @@ export class SkriptDocument {
         }
     }
 
-// 2. _updateSkriptParagraph 함수를 아래와 같이 수정
-private _updateSkriptParagraph() {
+    private _updateSkriptParagraph() {
         this._components.length = 0;
         let document = this._document;
-        const paragraphRegex = /(?<=^|\r\n|\r|\n)(?<comment>(\t|\s)*\#.*((\r\n|\r|\n)(\t|\s)+\#.*)*(\r\n|\r|\n)?)?(?<paragraph>[a-zA-Z0-9].*((\r\n|\r|\n)([\t\s]+.*|$))*)/g;
+        
+        // [완전 보강 버전]
+        // 1. 줄 시작 부분에 options, aliases, on, function, command 등이 오는지 확인
+        // 2. 다음 "들여쓰기 없는 새로운 구문"이 나오기 전까지의 모든 줄(주석, 빈줄 포함)을 한 덩어리로 묶음
+        const paragraphRegex = /(?<=^|\r\n|\r|\n)(?<comment>(\t|\s)*\#.*((\r\n|\r|\n)(\t|\s)+\#.*)*(\r\n|\r|\n)?)?(?<paragraph>[a-zA-Z0-9].*(\r\n|\r|\n|(?:\r\n|\r|\n)(?:[\t\s]+|\#.*|$))+)/g;
 
         let match;
         while ((match = paragraphRegex.exec(document)) !== null) {
@@ -141,24 +144,31 @@ private _updateSkriptParagraph() {
             if (groups && groups.paragraph) {
                 let paragraphText = this._trimParagraph(groups.paragraph);
                 
-                // [수정] indexOf를 쓰지 않고 match의 실제 인덱스로 좌표를 만듭니다.
-                // match[0] 안에서 paragraph가 시작되는 상대 위치를 더해줍니다.
-                let startOffset = match.index + match[0].indexOf(groups.paragraph);
+                // match[0] 내에서 실제 paragraph가 시작되는 지점 계산
+                let relativeOffset = match[0].indexOf(groups.paragraph);
+                let startOffset = match.index + relativeOffset;
+                
                 let startPos = this.positionAt(startOffset);
                 let endPos = this.positionAt(startOffset + paragraphText.length);
                 
                 if (startPos && endPos) {
                     let exactRange = new Range(startPos, endPos);
-                    // [핵심] 계산된 exactRange를 3번째 인자로 강제 주입
+                    
+                    // SkriptComponent에 정확한 좌표를 주입
                     let skParagraph = SkriptComponent.create(this, paragraphText, exactRange);
 
                     if (skParagraph) {
                         this._components.push(skParagraph);
+                        if (groups.comment) {
+                            let tooltip = this._trimToolTip(groups.comment);
+                            if (tooltip) skParagraph.setToolTip(new SkriptToolTip(skParagraph, tooltip));
+                        }
                     }
                 }
             }
-            if (match.index === paragraphRegex.lastIndex) {
-                paragraphRegex.lastIndex++;
+            // 검색 인덱스 꼬임 방지
+            if (paragraphRegex.lastIndex <= match.index) {
+                paragraphRegex.lastIndex = match.index + 1;
             }
         }
     }

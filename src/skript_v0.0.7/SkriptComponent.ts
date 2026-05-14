@@ -40,11 +40,14 @@ export abstract class SkriptComponent {
         if (!targetRange) return;
 
         let search;
-        // 1. Aliases & Options
+        // options: 뒤에 공백이나 주석이 있어도 잡을 수 있게 수정된 정규표현식
         if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
             return this._createAliases(skDocument, targetRange, search.component, search.head, search.body);
-        } else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
+
+        } else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)(?:[\t\s]+|\#.*|$))*))/i)?.groups) {
+            // options 인식 부분
             return this._createOptions(skDocument, targetRange, search.component, search.head, search.body);
+            
         } 
         // 2. Event (중복 구문 해결 핵심)
         else if (search = component.match(/^(?<component>(?<head>(on|every)\s+([^\:]+)|at\s+(\d{1,2}\:\d{1,2}|[^\:]+))\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
