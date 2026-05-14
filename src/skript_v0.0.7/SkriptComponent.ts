@@ -3,18 +3,13 @@ import { SkriptType } from "./language/SkriptType";
 import { SkriptDocument, SkriptLine } from "./SkriptDocument";
 import { SkriptParagraph } from "./SkriptParagraph";
 
-
-
 export interface SkriptKeyValue<T> {
     range: Range,
     key: string,
     value: T
 }
 
-
-
 export abstract class SkriptComponent {
-
     private readonly _skDocument: SkriptDocument;
     private readonly _range: Range;
     private readonly _title: string;
@@ -26,141 +21,111 @@ export abstract class SkriptComponent {
         this._title = title;
     }
 
-    get document(): SkriptDocument {
-        return this._skDocument;
-    }
-    get range(): Range {
-        return this._range;
-    }
-    get title(): string {
-        return this._title;
-    }
-    get tooltip(): SkriptToolTip | undefined {
-        return this._skToolTip;
-    }
-    public setToolTip(skTooltip:SkriptToolTip) {
-        this._skToolTip = skTooltip;
-    }
+    get document(): SkriptDocument { return this._skDocument; }
+    get range(): Range { return this._range; }
+    get title(): string { return this._title; }
+    get tooltip(): SkriptToolTip | undefined { return this._skToolTip; }
+    public setToolTip(skTooltip:SkriptToolTip) { this._skToolTip = skTooltip; }
 
     get isInvisible(): boolean {
-        if (!this._skToolTip)
-            return false;
-        return this._skToolTip.option.invisible
+        if (!this._skToolTip) return false;
+        return this._skToolTip.option.invisible;
     }
-
 
     abstract get symbolKind(): SymbolKind;
 
-
-    public static create(skDocument: SkriptDocument, component:string): SkriptComponent | undefined {
-        
-        let range = skDocument.getRange(component);
-        if (!range) return;
+    // 인수를 3개로 고정하여 외부에서 계산된 정확한 Range를 주입받습니다.
+    public static create(skDocument: SkriptDocument, component: string, range?: Range): SkriptComponent | undefined {
+        let targetRange = range || skDocument.getRange(component);
+        if (!targetRange) return;
 
         let search;
-        
-        // 1. Aliases & Options (기존 유지)
+        // 1. Aliases & Options
         if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
-            return this._createAliases(skDocument, range, search.component, search.head, search.body);
+            return this._createAliases(skDocument, targetRange, search.component, search.head, search.body);
+        } else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
+            return this._createOptions(skDocument, targetRange, search.component, search.head, search.body);
         } 
-        else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
-            return this._createOptions(skDocument, range, search.component, search.head, search.body);
+        // 2. Event (중복 구문 해결 핵심)
+        else if (search = component.match(/^(?<component>(?<head>(on|every)\s+([^\:]+)|at\s+(\d{1,2}\:\d{1,2}|[^\:]+))\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+            return this._createEvent(skDocument, targetRange, search.component, search.head, search.body || "");
         } 
-        // 2. Event (보강: 공백 포함 여러 단어 인식 및 몸체 유연성)
-        else if (search = component.match(/^(?<component>(?<head>(on|every|at)\s+[^\r\n\:]+)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
-            return this._createEvent(skDocument, range, search.component, search.head, search.body || "");
+        // 3. Command
+        else if (search = component.match(/^(?<component>(command\s?(?<head>[^\:]*))\:?(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)*))/i)?.groups) {
+            return this._createCommand(skDocument, targetRange, search.component, search.head, search.body || "");
         } 
-        // 3. Command (보강: 슬래시(/) 유무와 상관없이 인식)
-        else if (search = component.match(/^(?<component>(?<head>command\s+[^\r\n\:]+)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
-            return this._createCommand(skDocument, range, search.component, search.head, search.body || "");
-        } 
-        // 4. Function (보강)
-        else if (search = component.match(/^(?<component>(?<head>function\s+[\w\d]+\([^\)]*\)(\s*\:\:\s*[^\r\n\:]+)?)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
-            return this._createFunction(skDocument, range, search.component, search.head, search.body || "");
+        // 4. Function
+        else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s\:\:\s(?:[^:]+))?)\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+            return this._createFunction(skDocument, targetRange, search.component, search.head, search.body || "");
         }
         
         return;
     }
 
-
-
     private static _createAliases(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptAliases {
-
         let phrases = new Array<SkriptKeyValue<string[]>>();
         for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
             let groups = line.text.match(/(?:\t|\s{4})(?<aliase>(?<key>[^\=]+)\=(?<values>[^#]*))/)?.groups;
-            if (!groups)
-                continue;
+            if (!groups) continue;
             let aliase = groups.aliase.trim();
             let start = line.offset + line.text.indexOf(aliase);
             let phrase: SkriptKeyValue<string[]> = {
-                range: (() => {
-                    return new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + aliase.length)!)
-                })(),
+                range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + aliase.length)!),
                 key: groups.key.trim(),
                 value : groups.values.split(',').map(value => value.trim())
-            }
+            };
             phrases.push(phrase);
         }
         return new SkriptAliases(_skDocument, _range, phrases);
-        
     }
 
-
-
     private static _createOptions(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptOptions {
-
         let phrases = new Array<SkriptKeyValue<string>>();
         for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
             let groups = line.text.match(/(?:\t|\s{4})(?<option>(?<key>[^\:]+)\:(?<value>(\<\#\#\w*\>|[^#])*))/)?.groups;
-            if (!groups)
-                continue;
+            if (!groups) continue;
             let option = groups.option.trim();
             let start = line.offset + line.text.indexOf(option);
             let phrase: SkriptKeyValue<string> = {
-                range: (() => {
-                    return new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + option.length)!)
-                })(),
+                range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + option.length)!),
                 key: groups.key.trim(),
                 value : groups.value.trim()
-            }
+            };
             phrases.push(phrase);
         }
         return new SkriptOptions(_skDocument, _range, phrases);
     }
 
-
-
+// _createEvent 함수를 찾아서 이 코드로 교체하세요
     private static _createEvent(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptEvent {
-
+        // [핵심] 외부(Document)에서 준 정확한 _range를 그대로 사용합니다.
         let skEvent = new SkriptEvent(_skDocument, _range, _head);
-        let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
-        let range = new Range(_skDocument.positionAt(offset)!, _skDocument.positionAt(offset + _body.length)!);
-        let skParagraph = new SkriptParagraph(skEvent, range, _body);
-
-        skEvent.paragraph = skParagraph;
-
-        return skEvent;
         
+        // 본문(body) 위치도 외부에서 준 _range의 시작점을 기준으로 계산합니다.
+        if (_body && _body.length > 0) {
+            let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
+            let startPos = _skDocument.positionAt(offset);
+            let endPos = _skDocument.positionAt(offset + _body.length);
+            if (startPos && endPos) {
+                skEvent.paragraph = new SkriptParagraph(skEvent, new Range(startPos, endPos), _body);
+            }
+        }
+        return skEvent;
     }
 
-
-
     private static _createCommand(_skDocument:SkriptDocument, _range:Range, _component:string, _head?:string, _body?:string): SkriptCommand {
-
         let offset = _skDocument.offsetAt(_range.start);
-
         let info: SkriptCommandInfomation = {};
-
         let search = _head?.match(/\/?(?<label>[^\s]*)(?:\s(?<arguments>[^:]*))?/)?.groups;
         if (search) {
             info.label = search.label;
-            info.arguments = search.arguments
-        };
+            info.arguments = search.arguments;
+        }
 
         let paragraph: {range:Range, text:string} | undefined;
         let options = new Array<SkriptKeyValue<string>>();
         let match =_component.match(/(?!\r\n|\r|\n)(\t|\s{4})([^:]*)\:(.*)((\r\n|\r|\n)((\t|\s)*\#.*|(\t|\s{4}){2}.*))*/ig);
+        
         if (match) for (const m of match) {
             let groups = m.match(/(\t|\s{4})*(?<option>(?<key>[^\t\s][^:]*)\:(?<value>.*)((\r\n|\r|\n)(?<paragraph>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/)?.groups;
             if (groups) {
@@ -168,66 +133,56 @@ export abstract class SkriptComponent {
                 let start = _skDocument.positionAt(index);
                 let end = _skDocument.positionAt(index + groups.option.length);
                 if (!start || !end) continue;
-
                 let key = groups.key.trim().toLowerCase();
                 if (key !== 'trigger') {
-                        options.push({key: key, value: groups.value.trim(), range: new Range(start, end)});
-
+                    options.push({key: key, value: groups.value.trim(), range: new Range(start, end)});
                 } else {
                     options.push({key: key, value: '', range: new Range(new Position(start.line, 0), end)});
-                    paragraph = {text: groups.paragraph, range: new Range(new Position(start.line + 1, 0), end)};
+                    if (groups.paragraph) {
+                        paragraph = {text: groups.paragraph, range: new Range(new Position(start.line + 1, 0), end)};
+                    }
                 }
             }
         }
         if (options.length > 0 ) info.options = options;
-
         let skCommand = new SkriptCommand(_skDocument, _range, info);
-
         if (paragraph) {
             skCommand.paragraph = new SkriptParagraph(skCommand, paragraph.range, paragraph.text);
         }
-
         return skCommand;
-
     }
 
-
-
     private static _createFunction(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptFunction | undefined {
-
         let skFunction: SkriptFunction | undefined;
-
         let headGroup = _head.match(/^function\s(?<name>\w+)\((?<parameter>.*)\)(?:\s\:\:\s(?<type>[^:]+))?/i)?.groups;
         if (headGroup) {
             let parameters: SkriptFunctionParameter[] = [];
             let parameter = headGroup.parameter;
-            let search
+            let search;
             while (search = parameter.match(/(?<parameter>(?<name>[^\,\:]*)\:(?<type>[^\,\=]*)(?:\=(?<default>[^\,]*))?\,?)/)?.groups) {
                 parameters.push({
                     name: search.name.trim(),
                     type: SkriptType.create(search.type.trim()),
                     default: (search.default) ? search.default.trim() : undefined
-                })
+                });
                 parameter = parameter.replace(search.parameter, '');
             }
-    
             let info: SkriptFunctionInfomation = {
                 name: headGroup.name.trim(),
                 parameters: parameters,
                 type: (headGroup.type) ? SkriptType.create(headGroup.type.trim()) : undefined
             };
-
-            skFunction =  new SkriptFunction(_skDocument, _range, info);
-            
-            let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
-            let range = new Range(_skDocument.positionAt(offset)!, _skDocument.positionAt(offset + _body.length)!);
-            let skParagraph = new SkriptParagraph(skFunction, range, _body);
-
-            skFunction.paragraph = skParagraph;
+            skFunction = new SkriptFunction(_skDocument, _range, info);
+            if (_body && _body.length > 0) {
+                let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
+                let startPos = _skDocument.positionAt(offset);
+                let endPos = _skDocument.positionAt(offset + _body.length);
+                if (startPos && endPos) {
+                    skFunction.paragraph = new SkriptParagraph(skFunction, new Range(startPos, endPos), _body);
+                }
+            }
         }
-
         return skFunction;
-
     }
 }
 
