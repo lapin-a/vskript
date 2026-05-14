@@ -19,8 +19,11 @@
 	"icon": "img/cover.png",
 	"categories": [],
 	"activationEvents": [
-		"onLanguage:vskript"
-	],
+		"*",
+		"onLanguage:vskript",
+        "workspaceContains:**/*.sk",
+        "onStartupFinished"
+    ],
 	"main": "./out/extension.js",
 	"contributes": {
 		"languages": [

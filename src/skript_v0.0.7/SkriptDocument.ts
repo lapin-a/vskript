@@ -153,32 +153,37 @@ export class SkriptDocument {
         this._components.length = 0;
         
         let document = this._document;
-        let search
-        while (search = document.match(/(?<=^|\r\n|\r|\n)(?<comment>(\t|\s)*\#.*((\r\n|\r|\n)([^a-zA-Z].*)?)+)?(?<paragraph>[a-zA-Z].*((\r\n|\r|\n)([^a-zA-Z].*)?)+)/)) {
+        let search;
+        
+        // 보강된 정규표현식: 
+        // 1. 코멘트 그룹: #으로 시작하는 주석들을 잡음
+        // 2. 패러그래프 그룹: 줄의 시작이 문자/숫자인 것부터 시작해서, 
+        //    그 다음 줄이 공백(들여쓰기)으로 시작되는 모든 줄을 하나의 덩어리로 묶음
+        const paragraphRegex = /(?<=^|\r\n|\r|\n)(?<comment>(\t|\s)*\#.*((\r\n|\r|\n)(\t|\s)+\#.*)*(\r\n|\r|\n)?)?(?<paragraph>[a-zA-Z0-9].*((\r\n|\r|\n)([\t\s]+.*|$))*)/g;
 
+        while (search = paragraphRegex.exec(document)) {
             let groups = search.groups;
-            if (groups) {
-
-                // 생성
+            if (groups && groups.paragraph) {
+                // 문단 생성
                 let paragraph = this._trimParagraph(groups.paragraph);
                 let skParagraph = SkriptComponent.create(this, paragraph);
 
                 if (skParagraph) {
                     this._components.push(skParagraph);
 
-                    // docs 주석
+                    // 툴팁(주석) 처리
                     if (groups.comment) {
                         let tooltip = this._trimToolTip(groups.comment);
                         if (tooltip)
                             skParagraph.setToolTip(new SkriptToolTip(skParagraph, tooltip));
                     }
                 }
-    
-                document = document.substring(document.indexOf(paragraph) + paragraph.length);
+                
+                // 검색 위치를 현재 패러그래프 이후로 이동 (g 플래그 사용 시 exec가 알아서 관리하지만 안전장치)
+                if (search.index + search[0].length >= document.length) break;
             } else {
                 break;
             }
-
         }
     }
 

@@ -55,29 +55,31 @@ export abstract class SkriptComponent {
     public static create(skDocument: SkriptDocument, component:string): SkriptComponent | undefined {
         
         let range = skDocument.getRange(component);
-        if (!range)
-            return;
+        if (!range) return;
 
-        let search
+        let search;
+        
+        // 1. Aliases & Options (기존 유지)
         if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
             return this._createAliases(skDocument, range, search.component, search.head, search.body);
-
-        } else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
+        } 
+        else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
             return this._createOptions(skDocument, range, search.component, search.head, search.body);
-            
-        } else if (search = component.match(/^(?<component>(?<head>(on|every)\s+([^\:]+)|at\s+(\d{1,2}\:\d{1,2}|[^\:]+))\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
-            return this._createEvent(skDocument, range, search.component, search.head, search.body);
-            
-        } else if (search = component.match(/^(?<component>(command\s?(?<head>[^\:]*))\:?(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)*))/i)?.groups) {
-            return this._createCommand(skDocument, range, search.component, search.head, search.body);
-            
-        } else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s\:\:\s(?:[^:]+))?)\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
-            return this._createFunction(skDocument, range, search.component, search.head, search.body);
-            
+        } 
+        // 2. Event (보강: 공백 포함 여러 단어 인식 및 몸체 유연성)
+        else if (search = component.match(/^(?<component>(?<head>(on|every|at)\s+[^\r\n\:]+)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
+            return this._createEvent(skDocument, range, search.component, search.head, search.body || "");
+        } 
+        // 3. Command (보강: 슬래시(/) 유무와 상관없이 인식)
+        else if (search = component.match(/^(?<component>(?<head>command\s+[^\r\n\:]+)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
+            return this._createCommand(skDocument, range, search.component, search.head, search.body || "");
+        } 
+        // 4. Function (보강)
+        else if (search = component.match(/^(?<component>(?<head>function\s+[\w\d]+\([^\)]*\)(\s*\:\:\s*[^\r\n\:]+)?)\:(?<body_desc>.*)(?<body>((\r\n|\r|\n)([\t\s]+.*|$))*))/i)?.groups) {
+            return this._createFunction(skDocument, range, search.component, search.head, search.body || "");
         }
         
         return;
-
     }
 
 
