@@ -4,194 +4,194 @@ import { SkriptDocument, SkriptLine } from "./SkriptDocument";
 import { SkriptParagraph } from "./SkriptParagraph";
 
 export interface SkriptKeyValue<T> {
-    range: Range,
-    key: string,
-    value: T
+	range: Range,
+	key: string,
+	value: T
 }
 
 export abstract class SkriptComponent {
-    private readonly _skDocument: SkriptDocument;
-    private readonly _range: Range;
-    private readonly _title: string;
-    private _skToolTip?: SkriptToolTip;
-    
-    constructor (skDocument:SkriptDocument, range:Range, title:string) {
-        this._skDocument = skDocument;
-        this._range = range;
-        this._title = title;
-    }
+	private readonly _skDocument: SkriptDocument;
+	private readonly _range: Range;
+	private readonly _title: string;
+	private _skToolTip?: SkriptToolTip;
 
-    get document(): SkriptDocument { return this._skDocument; }
-    get range(): Range { return this._range; }
-    get title(): string { return this._title; }
-    get tooltip(): SkriptToolTip | undefined { return this._skToolTip; }
-    public setToolTip(skTooltip:SkriptToolTip) { this._skToolTip = skTooltip; }
+	constructor (skDocument:SkriptDocument, range:Range, title:string) {
+		this._skDocument = skDocument;
+		this._range = range;
+		this._title = title;
+	}
 
-    get isInvisible(): boolean {
-        if (!this._skToolTip) return false;
-        return this._skToolTip.option.invisible;
-    }
+	get document(): SkriptDocument { return this._skDocument; }
+	get range(): Range { return this._range; }
+	get title(): string { return this._title; }
+	get tooltip(): SkriptToolTip | undefined { return this._skToolTip; }
+	public setToolTip(skTooltip:SkriptToolTip) { this._skToolTip = skTooltip; }
 
-    abstract get symbolKind(): SymbolKind;
+	get isInvisible(): boolean {
+		if (!this._skToolTip) return false;
+		return this._skToolTip.option.invisible;
+	}
 
-    // 인수를 3개로 고정하여 외부에서 계산된 정확한 Range를 주입받습니다.
-    public static create(skDocument: SkriptDocument, component: string, range?: Range): SkriptComponent | undefined {
-        let targetRange = range || skDocument.getRange(component);
-        if (!targetRange) return;
+	abstract get symbolKind(): SymbolKind;
 
-        let search;
-        // options: 뒤에 공백이나 주석이 있어도 잡을 수 있게 수정된 정규표현식
-        if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
-            return this._createAliases(skDocument, targetRange, search.component, search.head, search.body);
+	// 인수를 3개로 고정하여 외부에서 계산된 정확한 Range를 주입받습니다.
+	public static create(skDocument: SkriptDocument, component: string, range?: Range): SkriptComponent | undefined {
+		let targetRange = range || skDocument.getRange(component);
+		if (!targetRange) return;
 
-        } else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)(?:[\t\s]+|\#.*|$))*))/i)?.groups) {
-            // options 인식 부분
-            return this._createOptions(skDocument, targetRange, search.component, search.head, search.body);
-            
-        } 
-        // 2. Event (중복 구문 해결 핵심)
-        else if (search = component.match(/^(?<component>(?<head>(on|every)\s+([^\:]+)|at\s+(\d{1,2}\:\d{1,2}|[^\:]+))\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
-            return this._createEvent(skDocument, targetRange, search.component, search.head, search.body || "");
-        } 
-        // 3. Command
-        else if (search = component.match(/^(?<component>(command\s?(?<head>[^\:]*))\:?(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)*))/i)?.groups) {
-            return this._createCommand(skDocument, targetRange, search.component, search.head, search.body || "");
-        } 
-        // 4. Function
-        else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s*\:\:\s*(?:[^:]+))?)\:(?:[^:]*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
-            return this._createFunction(skDocument, targetRange, search.component, search.head, search.body || "");
-        }
-        
-        return;
-    }
+		let search;
+		// options: 뒤에 공백이나 주석이 있어도 잡을 수 있게 수정된 정규표현식
+		if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
+			return this._createAliases(skDocument, targetRange, search.component, search.head, search.body);
 
-    private static _createAliases(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptAliases {
-        let phrases = new Array<SkriptKeyValue<string[]>>();
-        for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
-            let groups = line.text.match(/(?:\t|\s{4})(?<aliase>(?<key>[^\=]+)\=(?<values>[^#]*))/)?.groups;
-            if (!groups) continue;
-            let aliase = groups.aliase.trim();
-            let start = line.offset + line.text.indexOf(aliase);
-            let phrase: SkriptKeyValue<string[]> = {
-                range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + aliase.length)!),
-                key: groups.key.trim(),
-                value : groups.values.split(',').map(value => value.trim())
-            };
-            phrases.push(phrase);
-        }
-        return new SkriptAliases(_skDocument, _range, phrases);
-    }
+		} else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)(?:[\t\s]+|\#.*|$))*))/i)?.groups) {
+			// options 인식 부분
+			return this._createOptions(skDocument, targetRange, search.component, search.head, search.body);
 
-    private static _createOptions(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptOptions {
-        let phrases = new Array<SkriptKeyValue<string>>();
-        for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
-            let groups = line.text.match(/(?:\t|\s{4})(?<option>(?<key>[^\:]+)\:(?<value>(\<\#\#\w*\>|[^#])*))/)?.groups;
-            if (!groups) continue;
-            let option = groups.option.trim();
-            let start = line.offset + line.text.indexOf(option);
-            let phrase: SkriptKeyValue<string> = {
-                range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + option.length)!),
-                key: groups.key.trim(),
-                value : groups.value.trim()
-            };
-            phrases.push(phrase);
-        }
-        return new SkriptOptions(_skDocument, _range, phrases);
-    }
+		}
+		// 2. Event (중복 구문 해결 핵심)
+		else if (search = component.match(/^(?<component>(?<head>(on|every)\s+([^\:]+)|at\s+(\d{1,2}\:\d{1,2}|[^\:]+))\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+			return this._createEvent(skDocument, targetRange, search.component, search.head, search.body || "");
+		}
+		// 3. Command
+		else if (search = component.match(/^(?<component>(command\s?(?<head>[^\:]*))\:?(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)*))/i)?.groups) {
+			return this._createCommand(skDocument, targetRange, search.component, search.head, search.body || "");
+		}
+		// 4. Function
+		else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s*\:\:\s*(?:[^:]+))?)\:(?:[^:]*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+			return this._createFunction(skDocument, targetRange, search.component, search.head, search.body || "");
+		}
+
+		return;
+	}
+
+	private static _createAliases(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptAliases {
+		let phrases = new Array<SkriptKeyValue<string[]>>();
+		for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
+			let groups = line.text.match(/(?:\t|\s{4})(?<aliase>(?<key>[^\=]+)\=(?<values>[^#]*))/)?.groups;
+			if (!groups) continue;
+			let aliase = groups.aliase.trim();
+			let start = line.offset + line.text.indexOf(aliase);
+			let phrase: SkriptKeyValue<string[]> = {
+				range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + aliase.length)!),
+				key: groups.key.trim(),
+				value : groups.values.split(',').map(value => value.trim())
+			};
+			phrases.push(phrase);
+		}
+		return new SkriptAliases(_skDocument, _range, phrases);
+	}
+
+	private static _createOptions(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptOptions {
+		let phrases = new Array<SkriptKeyValue<string>>();
+		for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
+			let groups = line.text.match(/(?:\t|\s{4})(?<option>(?<key>[^\:]+)\:(?<value>(\<\#\#\w*\>|[^#])*))/)?.groups;
+			if (!groups) continue;
+			let option = groups.option.trim();
+			let start = line.offset + line.text.indexOf(option);
+			let phrase: SkriptKeyValue<string> = {
+				range: new Range(_skDocument.positionAt(start)!, _skDocument.positionAt(start + option.length)!),
+				key: groups.key.trim(),
+				value : groups.value.trim()
+			};
+			phrases.push(phrase);
+		}
+		return new SkriptOptions(_skDocument, _range, phrases);
+	}
 
 // _createEvent 함수를 찾아서 이 코드로 교체하세요
-    private static _createEvent(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptEvent {
-        // [핵심] 외부(Document)에서 준 정확한 _range를 그대로 사용합니다.
-        let skEvent = new SkriptEvent(_skDocument, _range, _head);
-        
-        // 본문(body) 위치도 외부에서 준 _range의 시작점을 기준으로 계산합니다.
-        if (_body && _body.length > 0) {
-            let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
-            let startPos = _skDocument.positionAt(offset);
-            let endPos = _skDocument.positionAt(offset + _body.length);
-            if (startPos && endPos) {
-                skEvent.paragraph = new SkriptParagraph(skEvent, new Range(startPos, endPos), _body);
-            }
-        }
-        return skEvent;
-    }
+	private static _createEvent(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptEvent {
+		// [핵심] 외부(Document)에서 준 정확한 _range를 그대로 사용합니다.
+		let skEvent = new SkriptEvent(_skDocument, _range, _head);
 
-    private static _createCommand(_skDocument:SkriptDocument, _range:Range, _component:string, _head?:string, _body?:string): SkriptCommand {
-        let offset = _skDocument.offsetAt(_range.start);
-        let info: SkriptCommandInfomation = {};
-        let search = _head?.match(/\/?(?<label>[^\s]*)(?:\s(?<arguments>[^:]*))?/)?.groups;
-        if (search) {
-            info.label = search.label;
-            info.arguments = search.arguments;
-        }
+		// 본문(body) 위치도 외부에서 준 _range의 시작점을 기준으로 계산합니다.
+		if (_body && _body.length > 0) {
+			let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
+			let startPos = _skDocument.positionAt(offset);
+			let endPos = _skDocument.positionAt(offset + _body.length);
+			if (startPos && endPos) {
+				skEvent.paragraph = new SkriptParagraph(skEvent, new Range(startPos, endPos), _body);
+			}
+		}
+		return skEvent;
+	}
 
-        let paragraph: {range:Range, text:string} | undefined;
-        let options = new Array<SkriptKeyValue<string>>();
-        let match =_component.match(/(?!\r\n|\r|\n)(\t|\s{4})([^:]*)\:(.*)((\r\n|\r|\n)((\t|\s)*\#.*|(\t|\s{4}){2}.*))*/ig);
-        
-        if (match) for (const m of match) {
-            let groups = m.match(/(\t|\s{4})*(?<option>(?<key>[^\t\s][^:]*)\:(?<value>.*)((\r\n|\r|\n)(?<paragraph>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/)?.groups;
-            if (groups) {
-                let index = offset + _component.indexOf(groups.option);
-                let start = _skDocument.positionAt(index);
-                let end = _skDocument.positionAt(index + groups.option.length);
-                if (!start || !end) continue;
-                let key = groups.key.trim().toLowerCase();
-                if (key !== 'trigger') {
-                    options.push({key: key, value: groups.value.trim(), range: new Range(start, end)});
-                } else {
-                    options.push({key: key, value: '', range: new Range(new Position(start.line, 0), end)});
-                    if (groups.paragraph) {
-                        paragraph = {text: groups.paragraph, range: new Range(new Position(start.line + 1, 0), end)};
-                    }
-                }
-            }
-        }
-        if (options.length > 0 ) info.options = options;
-        let skCommand = new SkriptCommand(_skDocument, _range, info);
-        if (paragraph) {
-            skCommand.paragraph = new SkriptParagraph(skCommand, paragraph.range, paragraph.text);
-        }
-        return skCommand;
-    }
+	private static _createCommand(_skDocument:SkriptDocument, _range:Range, _component:string, _head?:string, _body?:string): SkriptCommand {
+		let offset = _skDocument.offsetAt(_range.start);
+		let info: SkriptCommandInfomation = {};
+		let search = _head?.match(/\/?(?<label>[^\s]*)(?:\s(?<arguments>[^:]*))?/)?.groups;
+		if (search) {
+			info.label = search.label;
+			info.arguments = search.arguments;
+		}
 
-    private static _createFunction(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptFunction | undefined {
-        let skFunction: SkriptFunction | undefined;
-        let headGroup = _head.match(/^function\s(?<name>\w+)\((?<parameter>.*)\)(?:\s*\:\:\s*(?<type>[^:]+))?\s*(?:\:.*)?/i)?.groups;
-        if (headGroup) {
-            let parameters: SkriptFunctionParameter[] = [];
-            let parameter = headGroup.parameter;
-            let search;
-            while (search = parameter.match(/(?<parameter>(?<name>[^\,\:]*)\:(?<type>[^\,\=]*)(?:\=(?<default>[^\,]*))?\,?)/)?.groups) {
-                parameters.push({
-                    name: search.name.trim(),
-                    type: SkriptType.create(search.type.trim()),
-                    default: (search.default) ? search.default.trim() : undefined
-                });
-                parameter = parameter.replace(search.parameter, '');
-            }
-            let info: SkriptFunctionInfomation = {
-                name: headGroup.name.trim(),
-                parameters: parameters,
-                type: (headGroup.type) ? SkriptType.create(headGroup.type.trim()) : undefined
-            };
-            skFunction = new SkriptFunction(_skDocument, _range, info);
-            if (_body && _body.length > 0) {
-                let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
-                let startPos = _skDocument.positionAt(offset);
-                let endPos = _skDocument.positionAt(offset + _body.length);
-                if (startPos && endPos) {
-                    skFunction.paragraph = new SkriptParagraph(skFunction, new Range(startPos, endPos), _body);
-                }
-            }
-        }
-        return skFunction;
-    }
+		let paragraph: {range:Range, text:string} | undefined;
+		let options = new Array<SkriptKeyValue<string>>();
+		let match =_component.match(/(?!\r\n|\r|\n)(\t|\s{4})([^:]*)\:(.*)((\r\n|\r|\n)((\t|\s)*\#.*|(\t|\s{4}){2}.*))*/ig);
+
+		if (match) for (const m of match) {
+			let groups = m.match(/(\t|\s{4})*(?<option>(?<key>[^\t\s][^:]*)\:(?<value>.*)((\r\n|\r|\n)(?<paragraph>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/)?.groups;
+			if (groups) {
+				let index = offset + _component.indexOf(groups.option);
+				let start = _skDocument.positionAt(index);
+				let end = _skDocument.positionAt(index + groups.option.length);
+				if (!start || !end) continue;
+				let key = groups.key.trim().toLowerCase();
+				if (key !== 'trigger') {
+					options.push({key: key, value: groups.value.trim(), range: new Range(start, end)});
+				} else {
+					options.push({key: key, value: '', range: new Range(new Position(start.line, 0), end)});
+					if (groups.paragraph) {
+						paragraph = {text: groups.paragraph, range: new Range(new Position(start.line + 1, 0), end)};
+					}
+				}
+			}
+		}
+		if (options.length > 0 ) info.options = options;
+		let skCommand = new SkriptCommand(_skDocument, _range, info);
+		if (paragraph) {
+			skCommand.paragraph = new SkriptParagraph(skCommand, paragraph.range, paragraph.text);
+		}
+		return skCommand;
+	}
+
+	private static _createFunction(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptFunction | undefined {
+		let skFunction: SkriptFunction | undefined;
+		let headGroup = _head.match(/^function\s(?<name>\w+)\((?<parameter>.*)\)(?:\s*\:\:\s*(?<type>[^:]+))?\s*(?:\:.*)?/i)?.groups;
+		if (headGroup) {
+			let parameters: SkriptFunctionParameter[] = [];
+			let parameter = headGroup.parameter;
+			let search;
+			while (search = parameter.match(/(?<parameter>(?<name>[^\,\:]*)\:(?<type>[^\,\=]*)(?:\=(?<default>[^\,]*))?\,?)/)?.groups) {
+				parameters.push({
+					name: search.name.trim(),
+					type: SkriptType.create(search.type.trim()),
+					default: (search.default) ? search.default.trim() : undefined
+				});
+				parameter = parameter.replace(search.parameter, '');
+			}
+			let info: SkriptFunctionInfomation = {
+				name: headGroup.name.trim(),
+				parameters: parameters,
+				type: (headGroup.type) ? SkriptType.create(headGroup.type.trim()) : undefined
+			};
+			skFunction = new SkriptFunction(_skDocument, _range, info);
+			if (_body && _body.length > 0) {
+				let offset = _skDocument.offsetAt(_range.start) + _component.indexOf(_body);
+				let startPos = _skDocument.positionAt(offset);
+				let endPos = _skDocument.positionAt(offset + _body.length);
+				if (startPos && endPos) {
+					skFunction.paragraph = new SkriptParagraph(skFunction, new Range(startPos, endPos), _body);
+				}
+			}
+		}
+		return skFunction;
+	}
 }
 
 
 /**
- * Key-Value를 가지는 컴포넌트   
+ * Key-Value를 가지는 컴포넌트
  * SkriptAliases, SkriptOptions
  */
 export abstract class SkriptMapComponent extends SkriptComponent {
@@ -205,14 +205,14 @@ export abstract class SkriptMapComponent extends SkriptComponent {
  */
  export abstract class SkriptParagraphComponent extends SkriptComponent {
 
-    protected _skParagraph!: SkriptParagraph;
+	protected _skParagraph!: SkriptParagraph;
 
-    get paragraph(): SkriptParagraph {
-        return this._skParagraph;
-    }
-    set paragraph(skParagraph: SkriptParagraph) {
-        this._skParagraph = skParagraph;
-    }
+	get paragraph(): SkriptParagraph {
+		return this._skParagraph;
+	}
+	set paragraph(skParagraph: SkriptParagraph) {
+		this._skParagraph = skParagraph;
+	}
 
 }
 
@@ -220,47 +220,47 @@ export abstract class SkriptMapComponent extends SkriptComponent {
 
 export class SkriptAliases extends SkriptMapComponent {
 
-    private readonly _aliases = new Array<SkriptKeyValue<string[]>>();
+	private readonly _aliases = new Array<SkriptKeyValue<string[]>>();
 
-    constructor(skDocument:SkriptDocument, range:Range, aliases:SkriptKeyValue<string[]> []) {
-        super(skDocument, range, 'alaises')
-        this._aliases.push(...aliases);
-    }
+	constructor(skDocument:SkriptDocument, range:Range, aliases:SkriptKeyValue<string[]> []) {
+		super(skDocument, range, 'alaises')
+		this._aliases.push(...aliases);
+	}
 
-    /** ```
-     * SymbolKind.Constant
-     * ``` */
-    get symbolKind(): SymbolKind {
-        return SymbolKind.Constant;
-    }
+	/** ```
+	 * SymbolKind.Constant
+	 * ``` */
+	get symbolKind(): SymbolKind {
+		return SymbolKind.Constant;
+	}
 
-    public get aliases(){
-        return this._aliases
-    }
-    
+	public get aliases(){
+		return this._aliases
+	}
+
 }
 
 
 
 export class SkriptOptions extends SkriptMapComponent {
 
-    private readonly _options = new Array<SkriptKeyValue<string>>();
+	private readonly _options = new Array<SkriptKeyValue<string>>();
 
-    constructor(skDocument:SkriptDocument, range:Range, options:SkriptKeyValue<string>[]) {
-        super(skDocument, range, 'options')
-        this._options.push(...options);
-    }
+	constructor(skDocument:SkriptDocument, range:Range, options:SkriptKeyValue<string>[]) {
+		super(skDocument, range, 'options')
+		this._options.push(...options);
+	}
 
-    /** ```
-     * SymbolKind.Constant
-     * ``` */
-    get symbolKind(): SymbolKind {
-        return SymbolKind.Constant;
-    }
+	/** ```
+	 * SymbolKind.Constant
+	 * ``` */
+	get symbolKind(): SymbolKind {
+		return SymbolKind.Constant;
+	}
 
-    public get options(){
-        return this._options
-    }
+	public get options(){
+		return this._options
+	}
 
 }
 
@@ -268,60 +268,60 @@ export class SkriptOptions extends SkriptMapComponent {
 
 export class SkriptEvent extends SkriptParagraphComponent {
 
-    constructor(skDocument:SkriptDocument, range:Range, title:string) {
-        super(skDocument, range, title);
-    }
+	constructor(skDocument:SkriptDocument, range:Range, title:string) {
+		super(skDocument, range, title);
+	}
 
-    /** ```
-     * SymbolKind.Event
-     * ``` */
-    get symbolKind(): SymbolKind {
-        return SymbolKind.Event;
-    }
-    
+	/** ```
+	 * SymbolKind.Event
+	 * ``` */
+	get symbolKind(): SymbolKind {
+		return SymbolKind.Event;
+	}
+
 }
 
 
 
 
 export interface SkriptCommandInfomation {
-    label?: string;
-    arguments?: string;
-    options?: SkriptKeyValue<string>[];
+	label?: string;
+	arguments?: string;
+	options?: SkriptKeyValue<string>[];
 }
 
 export class SkriptCommand extends SkriptParagraphComponent {
 
-    private readonly _info?: SkriptCommandInfomation;
+	private readonly _info?: SkriptCommandInfomation;
 
-    constructor(skDocument:SkriptDocument, range:Range, info?:SkriptCommandInfomation) {
-        let title = 'command'
-        if (info) {
-            if (info.label) title +=  ` /${info.label}`;
-            if (info.arguments) title += ` ${info.arguments}`;
-        }
-        super(skDocument, range, title);
-        this._info = info;
-    }
+	constructor(skDocument:SkriptDocument, range:Range, info?:SkriptCommandInfomation) {
+		let title = 'command'
+		if (info) {
+			if (info.label) title +=  ` /${info.label}`;
+			if (info.arguments) title += ` ${info.arguments}`;
+		}
+		super(skDocument, range, title);
+		this._info = info;
+	}
 
-    get label() {
-        return this._info?.label
-    }
+	get label() {
+		return this._info?.label
+	}
 
-    get arguments() {
-        return this._info?.arguments
-    }
+	get arguments() {
+		return this._info?.arguments
+	}
 
-    get options() {
-        return this._info?.options
-    }
+	get options() {
+		return this._info?.options
+	}
 
-    /** ```
-     * SymbolKind.Class
-     * ``` */
-    get symbolKind(): SymbolKind {
-        return SymbolKind.Class;
-    }
+	/** ```
+	 * SymbolKind.Class
+	 * ``` */
+	get symbolKind(): SymbolKind {
+		return SymbolKind.Class;
+	}
 
 }
 
@@ -329,84 +329,84 @@ export class SkriptCommand extends SkriptParagraphComponent {
 
 
 export interface SkriptFunctionInfomation {
-    name: string,
-    parameters: SkriptFunctionParameter[] | undefined,
-    type: SkriptType | undefined
+	name: string,
+	parameters: SkriptFunctionParameter[] | undefined,
+	type: SkriptType | undefined
 }
 
 export interface SkriptFunctionParameter {
-    name: string,
-    type: SkriptType,
-    default: string | undefined
+	name: string,
+	type: SkriptType,
+	default: string | undefined
 }
 
 export class SkriptFunction extends SkriptParagraphComponent {
 
-    private readonly _info: SkriptFunctionInfomation;
+	private readonly _info: SkriptFunctionInfomation;
 
-    constructor(skDocument:SkriptDocument, range:Range, info:SkriptFunctionInfomation) {
-        let parameters = new Array<string>();
-        for (const parameter of info.parameters!) {
-            let text = `${parameter.name}:${parameter.type.text}`;
-            if (parameter.default)
-                text += `=${parameter.default}`
-            parameters.push(text);
-        }
-        let title = `${info.name}(${parameters.join(', ')})${(info.type) ? ` :: ${info.type.text}:` : `:`}`;
-        super(skDocument, range, title);
-        this._info = info;
+	constructor(skDocument:SkriptDocument, range:Range, info:SkriptFunctionInfomation) {
+		let parameters = new Array<string>();
+		for (const parameter of info.parameters!) {
+			let text = `${parameter.name}:${parameter.type.text}`;
+			if (parameter.default)
+				text += `=${parameter.default}`
+			parameters.push(text);
+		}
+		let title = `${info.name}(${parameters.join(', ')})${(info.type) ? ` :: ${info.type.text}:` : `:`}`;
+		super(skDocument, range, title);
+		this._info = info;
 
-    }
+	}
 
-    get name(): string {
-        return this._info.name;
-    }
+	get name(): string {
+		return this._info.name;
+	}
 
-    get parameters(): SkriptFunctionParameter[] | undefined {
-        return this._info.parameters;
-    }
+	get parameters(): SkriptFunctionParameter[] | undefined {
+		return this._info.parameters;
+	}
 
-    get returnType(): SkriptType | undefined {
-        return this._info.type;
-    }
+	get returnType(): SkriptType | undefined {
+		return this._info.type;
+	}
 
-    /** ```
-     * SymbolKind.Function
-     * ``` */
-    get symbolKind(): SymbolKind {
-        return SymbolKind.Function;
-    }
-    
+	/** ```
+	 * SymbolKind.Function
+	 * ``` */
+	get symbolKind(): SymbolKind {
+		return SymbolKind.Function;
+	}
+
 }
 
 
 
 interface SkriptComponentOption {
-    invisible: boolean;
+	invisible: boolean;
 }
 
 export class SkriptToolTip {
-    
+
 
 	private readonly _skParagraph: SkriptComponent;
-    private readonly _tooltip: string[];
-    private _markdown: MarkdownString | undefined;
-    private readonly _skCompOption: SkriptComponentOption;
+	private readonly _tooltip: string[];
+	private _markdown: MarkdownString | undefined;
+	private readonly _skCompOption: SkriptComponentOption;
 
 
-    constructor(skParagraph:SkriptComponent, tooltip:string[]) {
+	constructor(skParagraph:SkriptComponent, tooltip:string[]) {
 		this._skParagraph = skParagraph;
-        this._tooltip = tooltip;
-        this._skCompOption = {invisible: false}
-        tooltip.forEach(line => {
-            if (line.match(/\@invisible/i)) this._skCompOption.invisible = true;
-        })
-    }
+		this._tooltip = tooltip;
+		this._skCompOption = {invisible: false}
+		tooltip.forEach(line => {
+			if (line.match(/\@invisible/i)) this._skCompOption.invisible = true;
+		})
+	}
 
-    get option(): SkriptComponentOption {
-        return this._skCompOption;
-    }
-    
+	get option(): SkriptComponentOption {
+		return this._skCompOption;
+	}
+
 	get markdown(): MarkdownString {
 		if (!this._markdown) {
 			let docs = new Array<string>();
@@ -420,7 +420,7 @@ export class SkriptToolTip {
 			}
 			this._markdown = new MarkdownString()
 				.appendCodeblock('function ' + this._skParagraph.title);
-			
+
 			if (docs.length > 0) {
 				docs.unshift('***');
 				docs.push('');

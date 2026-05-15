@@ -8,7 +8,7 @@ export const SYMBOLS_MAP = new Map<string, DocumentSymbol[]>();
 
 export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 	public provideDocumentSymbols(document: TextDocument): DocumentSymbol[] {
-        console.log("--- 개요(Symbol) 함수 호출됨 ---");
+		console.log("--- 개요(Symbol) 함수 호출됨 ---");
 		let fsPath = document.uri.fsPath;
 		const cached = SYMBOLS_MAP.get(fsPath);
 
@@ -16,13 +16,13 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 		if (!cached || cached.length === 0 || document.isDirty) {
 			let symbols: DocumentSymbol[] = [];
 			let skDocument = Skript.find(fsPath);
-            console.log(`[데이터 모델 확인] 찾은 컴포넌트 개수: ${skDocument?.components.length ?? "없음"}`);
-			
+			console.log(`[데이터 모델 확인] 찾은 컴포넌트 개수: ${skDocument?.components.length ?? "없음"}`);
+
 			// 아직 스캔 중이라 문서를 못 찾았다면 캐시에 저장하지 않고 빈 배열 리턴 (재시도 유도)
 			if (!skDocument) {
-                console.log(`[주의] ${fsPath}에 대한 데이터 모델을 찾지 못해 기존 캐시를 반환합니다.`);
-                return cached || []; // 모델이 없으면 옛날 개요라도 보여줍니다.
-            }
+				console.log(`[주의] ${fsPath}에 대한 데이터 모델을 찾지 못해 기존 캐시를 반환합니다.`);
+				return cached || []; // 모델이 없으면 옛날 개요라도 보여줍니다.
+			}
 
 			// --- 1. Aliases ---
 			for (const skAliases of skDocument.getComponents(SkriptAliases)) {
@@ -76,7 +76,7 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 			// --- 5. Function ---
 			for (const skFunction of skDocument.getComponents(SkriptFunction)) {
 				// 매개변수 리스트를 문자열로 변환 (예: "arg1: type, arg2: type")
-				// SkriptFunction의 속성명은 프로젝트 구조에 따라 다를 수 있으니 
+				// SkriptFunction의 속성명은 프로젝트 구조에 따라 다를 수 있으니
 				// skFunction.parameters 혹은 skFunction.arguments를 확인해 보세요.
 				let paramsString = "";
 				if (skFunction.parameters && Array.isArray(skFunction.parameters)) {
@@ -89,10 +89,10 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 				const fullTitle = `${skFunction.title}(${paramsString})`;
 
 				let functionSymbol = new DocumentSymbol(
-					fullTitle, 
-					'Function', 
-					SymbolKind.Function, 
-					skFunction.range, 
+					fullTitle,
+					'Function',
+					SymbolKind.Function,
+					skFunction.range,
 					skFunction.range
 				);
 
@@ -104,7 +104,7 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 
 			// --- 6. Variables ---
 			const allVariables: SkriptVariable[] = [];
-			
+
 			// skDocument.components 내의 모든 요소를 확인합니다.
 			for (const component of skDocument.components) {
 				// 1. component가 존재하고, 그 안에 paragraph와 variables가 있는지 안전하게 확인합니다.
@@ -120,17 +120,17 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 				// 부모 심볼의 위치를 문서 첫 줄로 설정
 				const rootRange = new Range(new Position(0, 0), new Position(0, 0));
 				const variablesRootSymbol = new DocumentSymbol(
-					'Variables', 
-					'Local Variables', 
-					SymbolKind.Interface, 
-					rootRange, 
+					'Variables',
+					'Local Variables',
+					SymbolKind.Interface,
+					rootRange,
 					rootRange
 				);
 
 				// 중복 제거 및 심볼 생성 유틸리티 호출
 				const variableSymbols = this._createVariableSymbols(allVariables);
 				variablesRootSymbol.children.push(...variableSymbols);
-				
+
 				symbols.push(variablesRootSymbol);
 			}
 

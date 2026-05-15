@@ -78,7 +78,7 @@ export interface Comparator<T> {
 
 
 export class Stream<T> extends JavaObject {
-	
+
 	protected readonly _values: T[];
 
 	constructor(values: T[]) {
@@ -133,7 +133,7 @@ export class Stream<T> extends JavaObject {
 		return this;
 	}
 
-	
+
 
 	public comparate(comparator: (value1: T, value2: T) => number): ComparableStream<T> {
 		return new ComparableStream<T>(this, comparator);
