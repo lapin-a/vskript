@@ -4,6 +4,7 @@ import * as Path from 'path';
 import { SkriptDocument, SkriptPath } from './SkriptDocument';
 
 export const DOCUMENTS = new Array<SkriptDocument>();
+export { SkriptDocument, SkriptPath } from './SkriptDocument';
 
 /** 스크립트 활성화 시 워크스페이스 전체 스캔 */
 export async function onSkriptEnable() {

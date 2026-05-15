@@ -71,20 +71,20 @@
 			}
 		],
 		"configuration": {
-            "title": "vSkript",
-            "properties": {
-                "vskript.analyze.indentation": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "들여쓰기 오류(혼용 및 깊이)를 검사할지 여부를 설정합니다."
-                },
-                "vskript.analyze.preferSpaces": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "체크 시 공백(Space)을, 체크 해제 시 탭(Tab)을 권장 들여쓰기로 사용합니다."
-                }
-            }
-        },
+			"title": "vSkript",
+			"properties": {
+				"vskript.analyze.indentation": {
+					"type": "boolean",
+					"default": true,
+					"description": "들여쓰기 오류(혼용 및 깊이)를 검사할지 여부를 설정합니다."
+				},
+				"vskript.analyze.preferSpaces": {
+					"type": "boolean",
+					"default": false,
+					"description": "체크 시 공백(Space)을, 체크 해제 시 탭(Tab)을 권장 들여쓰기로 사용합니다."
+				}
+			}
+		},
 		"configurationDefaults": {
 			"[vskript]": {
 				"editor.semanticHighlighting.enabled": true
@@ -112,5 +112,8 @@
 		"mocha": "^8.2.1",
 		"typescript": "^4.1.3",
 		"vscode-test": "^1.5.0"
+	},
+	"dependencies": {
+		"axios": "^1.16.1"
 	}
 }

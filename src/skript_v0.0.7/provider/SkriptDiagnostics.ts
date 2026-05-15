@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-// 주의: 아래 경로는 프로젝트 구조에 따라 '../Skript' 또는 './SkriptDocument' 등으로 수정이 필요할 수 있습니다.
-import { SkriptDocument } from '../Skript';
+import { SkriptDocument } from '../Skript'; 
+import { SkriptComponent } from '../SkriptComponent';
 
 /**
  * vskript의 구문 오류(Diagnostics)를 관리하는 컬렉션입니다.
@@ -86,7 +86,7 @@ export function refreshDiagnostics(document: vscode.TextDocument): void {
  */
 function isVersionCompatible(current: string, required: string): boolean {
     const curr = current.split('.').map(Number);
-    const req = required.split('.').map(Number); // 이전 에러(req) 수정 완료
+    const req = required.split('.').map(Number);
     
     for (let i = 0; i < Math.max(curr.length, req.length); i++) {
         const currVal = curr[i] || 0;
@@ -102,18 +102,19 @@ function isVersionCompatible(current: string, required: string): boolean {
  */
 export function checkVersionCompatibility(document: SkriptDocument, versionData: any): vscode.Diagnostic[] {
     const diagnostics: vscode.Diagnostic[] = [];
-    // 문서에서 감지된 버전이 없으면 기본값으로 2.6 사용
     const docVersion = document.version || "2.6"; 
 
-    document.components.forEach(comp => {
-        // DB에서 해당 컴포넌트(함수, 이벤트 등)의 추가된 버전 정보 확인
-        const syntaxInfo = versionData[comp.title]; 
+    // document.components (getter)를 통해 접근
+    document.components.forEach((comp: any) => { 
+        // SkriptComponent에 title이 없을 수 있으므로 안전하게 처리
+        const syntaxTitle = comp.title || ""; 
+        const syntaxInfo = versionData[syntaxTitle]; 
         
         if (syntaxInfo && syntaxInfo.added) {
             if (!isVersionCompatible(docVersion, syntaxInfo.added)) {
                 const diagnostic = new vscode.Diagnostic(
                     comp.range,
-                    `[호환성 경고] '${comp.title}' 구문은 Skript v${syntaxInfo.added}부터 지원됩니다. 현재 설정 버전(v${docVersion})과 호환되지 않습니다.`,
+                    `[호환성 경고] '${syntaxTitle}' 구문은 Skript v${syntaxInfo.added}부터 지원됩니다. 현재 버전(v${docVersion})과 호환되지 않습니다.`,
                     vscode.DiagnosticSeverity.Warning
                 );
                 diagnostics.push(diagnostic);

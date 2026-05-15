@@ -18,6 +18,7 @@ export class SkriptDocument {
 	private _document: string;
 	private _skLines: SkriptLine[] = [];
 	private _components: SkriptComponent[] = [];
+	private _addons: string[] = []; // [추가]
 	// 1. 버전을 저장할 프로퍼티 추가
 	private _version: string | undefined;
 
@@ -113,12 +114,14 @@ export class SkriptDocument {
 		this._update();
 	}
 
+	// [추가] 외부에서 읽을 수 있게 getter 선언
+    public get addons() { return this._addons; }
+
 	private _update() {
 		this._detectVersion();
+		this._detectAddons(); // [추가] 애드온 감지 실행
 		this._updateSkriptLine();
 		this._updateSkriptParagraph()
-		this._updateSkriptLine();
-		this._updateSkriptParagraph();
 	}
 
 	private _detectVersion() {
@@ -137,6 +140,19 @@ export class SkriptDocument {
 			this._version = undefined;
 		}
 	}
+
+	private _detectAddons() {
+        const lines = this._document.split(/\r\n|\r|\n/).slice(0, 10);
+        for (const line of lines) {
+            // # [V] addons: SkQuery, TuSKe 형태를 찾습니다.
+            const match = line.match(/^#\s*(?:\[V\]|vskript-)\s*addons\s*:\s*(.*)/i);
+            if (match) {
+                this._addons = match[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
+                return;
+            }
+        }
+        this._addons = []; // 못 찾으면 빈 배열
+    }
 
 	private _updateSkriptLine() {
 		this._skLines.length = 0;
