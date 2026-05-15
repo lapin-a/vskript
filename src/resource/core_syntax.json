@@ -1,0 +1,24 @@
+{
+  "send %string% to %player%": {
+    "name": "send",
+    "added": "2.0",
+    "addon": "Skript",
+    "type": "effect",
+    "patterns": ["send %string% to %players%"],
+    "description": {
+      "en": "Sends a message to the specified players.",
+      "ko": "대상 플레이어에게 메시지를 보냅니다."
+    }
+  },
+  "cancel event": {
+    "name": "cancel event",
+    "added": "1.0",
+    "addon": "Skript",
+    "type": "effect",
+    "patterns": ["cancel [the] event"],
+    "description": {
+      "en": "Cancels the current event.",
+      "ko": "현재 이벤트를 취소합니다."
+    }
+  }
+}

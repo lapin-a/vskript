@@ -2,12 +2,24 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import axios from 'axios';
+import { EventEmitter } from 'events';
 
 export interface SyntaxData {
-    added: string;
-    addon?: string;
+    name: string;       // 구문 이름 (예: "on player join")
+    added: string;      // Skript 버전 (예: "2.5", "2.6")
+    addon: string;      // 소속 애드온 (기본 "Skript")
+    type: string;       // 구문 유형 (예: "event", "condition", "effect")
+    patterns: string[]; // 구문 패턴 (예: ["on player join", "when player joins"])
     removed?: string;
-    description_ko?: string;
+    description: {      // 구문 설명 (언어별)
+        en: string;
+        ko: string;
+    };
+}
+
+export interface LocalDatabase {
+    last_updated: string;               // 마지막 업데이트 날짜
+    data: { [key: string]: SyntaxData }; // 패턴이나 이름을 키로 사용하는 데이터셋
 }
 
 export class SkriptHubClient {
@@ -23,9 +35,19 @@ export class SkriptHubClient {
 
     /** 로컬에 저장된 DB 로드 */
     private loadLocalDb() {
-        if (fs.existsSync(this.storagePath)) {
+        if (!fs.existsSync(this.storagePath)) {
+            const defaultDataPath = path.join(__dirname, '..', 'resources', 'core_syntax.json');
+            if (fs.existsSync(defaultDataPath)) {
+                const defaultData = fs.readFileSync(defaultDataPath, 'utf-8');
+                this.syntaxDb = JSON.parse(defaultData);
+                this.saveDb(); // 로컬 저장소로 초기 복사
+                console.log("기본 코어 데이터를 로드했습니다.");
+                return;
+            }
+            if (fs.existsSync(this.storagePath)) {
             const rawData = fs.readFileSync(this.storagePath, 'utf-8');
             this.syntaxDb = JSON.parse(rawData);
+            }
         }
     }
 
@@ -44,9 +66,15 @@ export class SkriptHubClient {
                 const name = item.name;
                 if (!this.syntaxDb[name]) {
                     this.syntaxDb[name] = {
+                        name: name,
                         added: item.added_in || "2.0",
                         addon: "Skript", // 기본적으로 Skript 코어 구문으로 간주
-                        description_ko: "" // 나중에 번역 엔진으로 채울 공간
+                        type: item.type || "effect",
+                        patterns: item.patterns || [name],
+                        description: {
+                            en: item.description || "",
+                            ko: "" // 추후 번역 엔진 연동 구역
+                        } // 나중에 번역 엔진으로 채울 공간
                     };
                     updatedCount++;
                 }
@@ -92,9 +120,15 @@ export class SkriptHubClient {
                     // 구문이 이미 DB에 없으면 추가
                     if (!this.syntaxDb[item.name]) {
                         this.syntaxDb[item.name] = {
+                            name: item.name,
                             added: item.added_in || "1.0",
                             addon: addonName,
-                            description_ko: "" // 추후 번역 엔진 연동 구역
+                            type: item.type || "effect",
+                            patterns: item.patterns || [item.name],
+                            description: {
+                                en: item.description || "",
+                                ko: "" // 추후 번역 엔진 연동 구역
+                            }
                         };
                     }
                 });
