@@ -58,7 +58,7 @@ export abstract class SkriptComponent {
             return this._createCommand(skDocument, targetRange, search.component, search.head, search.body || "");
         } 
         // 4. Function
-        else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s\:\:\s(?:[^:]+))?)\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+        else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s*\:\:\s*(?:[^:]+))?)\:(?:[^:]*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
             return this._createFunction(skDocument, targetRange, search.component, search.head, search.body || "");
         }
         
@@ -157,7 +157,7 @@ export abstract class SkriptComponent {
 
     private static _createFunction(_skDocument:SkriptDocument, _range:Range, _component:string, _head:string, _body:string): SkriptFunction | undefined {
         let skFunction: SkriptFunction | undefined;
-        let headGroup = _head.match(/^function\s(?<name>\w+)\((?<parameter>.*)\)(?:\s\:\:\s(?<type>[^:]+))?/i)?.groups;
+        let headGroup = _head.match(/^function\s(?<name>\w+)\((?<parameter>.*)\)(?:\s*\:\:\s*(?<type>[^:]+))?\s*(?:\:.*)?/i)?.groups;
         if (headGroup) {
             let parameters: SkriptFunctionParameter[] = [];
             let parameter = headGroup.parameter;

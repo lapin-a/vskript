@@ -8,6 +8,7 @@ export const SYMBOLS_MAP = new Map<string, DocumentSymbol[]>();
 
 export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 	public provideDocumentSymbols(document: TextDocument): DocumentSymbol[] {
+        console.log("--- 개요(Symbol) 함수 호출됨 ---");
 		let fsPath = document.uri.fsPath;
 		const cached = SYMBOLS_MAP.get(fsPath);
 
@@ -15,9 +16,13 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 		if (!cached || cached.length === 0 || document.isDirty) {
 			let symbols: DocumentSymbol[] = [];
 			let skDocument = Skript.find(fsPath);
+            console.log(`[데이터 모델 확인] 찾은 컴포넌트 개수: ${skDocument?.components.length ?? "없음"}`);
 			
 			// 아직 스캔 중이라 문서를 못 찾았다면 캐시에 저장하지 않고 빈 배열 리턴 (재시도 유도)
-			if (!skDocument) return [];
+			if (!skDocument) {
+                console.log(`[주의] ${fsPath}에 대한 데이터 모델을 찾지 못해 기존 캐시를 반환합니다.`);
+                return cached || []; // 모델이 없으면 옛날 개요라도 보여줍니다.
+            }
 
 			// --- 1. Aliases ---
 			for (const skAliases of skDocument.getComponents(SkriptAliases)) {
