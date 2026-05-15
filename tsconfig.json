@@ -1,20 +1,23 @@
 {
-    "compilerOptions": {
-        "module": "commonjs",
-        "target": "ESNext",
-        "outDir": "out",
-        "lib": ["ESNext", "DOM"],
-        "sourceMap": true,
-        "rootDir": "src",
-        "strict": true,
-        "noImplicitReturns": true,
-        "noFallthroughCasesInSwitch": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "types": ["node"]
-    },
-    "exclude": [
-        "node_modules",
-        ".vscode-test"
-    ]
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "ESNext",
+		"outDir": "out",
+		"lib": ["ESNext", "DOM"],
+		"sourceMap": true,
+		"rootDir": "src",
+		"strict": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"types": [
+			"node",
+			"vscode"
+		]
+	},
+	"exclude": [
+		"node_modules",
+		".vscode-test"
+	]
 }
