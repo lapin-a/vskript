@@ -26,7 +26,7 @@ export class SkriptHubClient {
 	private static readonly API_URL = "https://skripthub.net/api/v1/syntax/";
 	private storagePath: string;
 	private syntaxDb: { [key: string]: SyntaxData } = {};
-
+	private indexedDb: { [firstWord: string]: SyntaxData[] } = {};
 	
 	constructor(context: vscode.ExtensionContext) {
 		// 확장 프로그램의 전역 저장소 경로 설정
@@ -37,6 +37,79 @@ export class SkriptHubClient {
 		this.loadLocalDb(context.extensionPath);
 	}
 
+	/** 로드된 syntaxDb를 기반으로 첫 단어 기준 인덱스를 빌드합니다. */
+    private buildIndex() {
+        this.indexedDb = {}; // 기존 인덱스 비우기
+
+        for (const key in this.syntaxDb) {
+            const syntax = this.syntaxDb[key];
+            
+            // 구문 패턴들의 첫 단어를 추출합니다. (예: "send %string%" -> "send")
+            if (syntax.patterns && syntax.patterns.length > 0) {
+                syntax.patterns.forEach(pattern => {
+                    const firstWord = pattern.trim().split(/\s+/)[0].toLowerCase();
+                    
+                    if (firstWord) {
+                        // 해당 단어 주머니가 없으면 새로 만들기
+                        if (!this.indexedDb[firstWord]) {
+                            this.indexedDb[firstWord] = [];
+                        }
+                        // 중복되지 않게 주머니에 쏙 넣기
+                        if (!this.indexedDb[firstWord].includes(syntax)) {
+                            this.indexedDb[firstWord].push(syntax);
+                        }
+                    }
+                });
+            }
+        }
+        console.log(`[인덱서] 총 ${Object.keys(this.indexedDb).length}개의 핵심 키워드로 구문 인덱싱 완료.`);
+    }
+
+	/** 사용자가 입력한 코드 한 줄을 받아 일치하는 Skript 구문 데이터를 찾아 반환합니다. */
+    public findMatch(userLine: string): SyntaxData | null {
+        const cleanLine = userLine.trim();
+        if (!cleanLine) return null;
+
+        // 1. 사용자가 쓴 코드의 첫 단어 추출 (예: "send" "hi" -> "send")
+        const firstWord = cleanLine.split(/\s+/)[0].toLowerCase();
+        
+        // 2. 해당 첫 단어로 시작하는 구문 후보들 목록만 쏙 골라오기
+        const candidates = this.indexedDb[firstWord];
+        if (!candidates) return null; // 등록된 구문 중 해당 단어로 시작하는 게 없으면 즉시 패스
+
+        // 3. 전체 DB 대신 '후보군'만 정밀 검사 (우리가 만든 patternToRegex 활용)
+        for (const syntax of candidates) {
+            for (const pattern of syntax.patterns) {
+                // 이전에 파일 최하단에 만들어둔 patternToRegex 함수를 호출합니다.
+                // 만약 클래스 내부에 만드셨다면 this.patternToRegex(pattern)으로 수정해 주세요!
+                const regex = this.patternToRegex(pattern); 
+                
+                if (regex.test(cleanLine)) {
+                    return syntax; // 정확히 일치하는 패턴을 찾으면 즉시 반환!
+                }
+            }
+        }
+
+        return null; // 후보 키워드는 맞지만 패턴이 정확히 일치하지 않는 경우
+    }
+	private patternToRegex(pattern: string): RegExp {
+        // 1. 특수문자 에스케이프 (정규식에서 오작동할 수 있는 문자들을 안전하게 처리)
+        let regexStr = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // 2. 대괄호 [ ] 처리: Skript에서 [the] 같은 대괄호는 선택 사항(생략 가능)을 의미합니다.
+        // 변환 예: "cancel \\[the\\] event" -> "cancel (the)? event"
+        regexStr = regexStr.replace(/\\\[([^\\\]]+)\\\\]/g, "($1)?");
+
+        // 3. %type% 처리: 변수가 들어갈 자리를 (.+)로 치환하여 어떤 값이 들어와도 매칭되게 만듭니다.
+        regexStr = regexStr.replace(/%[^%]+%/g, "(.+)");
+
+        // 4. 공백 최적화: 띄어쓰기가 여러 개 있더라도 하나로 인식하게 만들고 시작(^)과 끝($)을 명시합니다.
+        regexStr = regexStr.trim().replace(/\s+/g, "\\s+");
+        
+        // 대소문자를 구분하지 않도록 "i" 플래그를 주어 리턴합니다.
+        return new RegExp(`^${regexStr}$`, "i");
+    }
+	
 	/** 로컬에 저장된 DB 로드 및 Seed Data 초기화 */
 	private loadLocalDb(extensionPath: string) {
 		// 1. 만약 사용자 전역 저장소에 DB 파일이 없다면?
@@ -68,6 +141,7 @@ export class SkriptHubClient {
 				this.syntaxDb = {};
 			}
 		}
+		this.buildIndex();
 	}
 
 	/** 서버에서 새로운 데이터를 가져와 업데이트 (증분 업데이트) */

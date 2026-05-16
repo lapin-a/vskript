@@ -3,6 +3,7 @@ import * as Skript from '../Skript';
 import { SkriptFunction } from '../SkriptComponent';
 import { SYMBOLS_MAP } from '../provider/SkriptDocumentSymbolProvider';
 import { refreshDiagnostics } from '../provider/SkriptDiagnostics';
+import { SkriptHubClient } from '../SkriptHubClient';
 
 // 진단 실행 타이머 관리를 위한 변수
 let diagnosticTimeout: NodeJS.Timeout | undefined;
@@ -10,9 +11,9 @@ let diagnosticTimeout: NodeJS.Timeout | undefined;
 /**
  * 문서 수정 이벤트 핸들러
  */
-export default function TextDocumentChangeEvent(event: vscode.TextDocumentChangeEvent) {
-	const document = event.document;
-	if (document.languageId !== 'vskript') return;
+export default function TextDocumentChangeEvent(event: vscode.TextDocumentChangeEvent, client: SkriptHubClient) {
+    const document = event.document;
+    if (document.languageId !== 'vskript') return;
 
 	// --- 수정 부분 ---
 	// 단순히 fsPath를 가져오는 대신, URI를 통해 경로 형식을 강제로 통일합니다.
@@ -34,19 +35,19 @@ export default function TextDocumentChangeEvent(event: vscode.TextDocumentChange
 	// 4. 무거운 작업(진단 및 캐시 갱신)은 디바운싱 처리
 	// 이전에 예약된 진단 작업이 있다면 취소합니다.
 	if (diagnosticTimeout) {
-		clearTimeout(diagnosticTimeout);
-	}
+        clearTimeout(diagnosticTimeout);
+    }
 
-	// 500ms(0.5초) 동안 추가 입력이 없으면 실행
-	diagnosticTimeout = setTimeout(() => {
-		// 개요(Outline) 캐시 비우기
-		SYMBOLS_MAP.delete(fsPath);
-		
-		// 구문 검사 실행
-		refreshDiagnostics(document);
-		
-		diagnosticTimeout = undefined;
-	}, 500);
+    // 500ms(0.5초) 동안 추가 입력이 없으면 실행
+    diagnosticTimeout = setTimeout(() => {
+        // 개요(Outline) 캐시 비우기
+        SYMBOLS_MAP.delete(fsPath);
+        
+        // 🌟 이 부분을 수정합니다! client를 함께 넘겨줍니다.
+        refreshDiagnostics(document, client);
+        
+        diagnosticTimeout = undefined;
+    }, 500);
 
 	// 5. 부가 기능 (엔터 시 주석 자동 생성 등은 즉각적인 반응을 위해 타이머 밖에서 실행)
 	for (const context of changes) {

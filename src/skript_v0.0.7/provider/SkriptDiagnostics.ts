@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SkriptDocument } from '../Skript'; 
 import { SkriptComponent } from '../SkriptComponent';
+import { SkriptHubClient } from '../SkriptHubClient';
 
 /**
  * vskript의 구문 오류(Diagnostics)를 관리하는 컬렉션입니다.
@@ -10,7 +11,7 @@ export const skriptDiagnostics = vscode.languages.createDiagnosticCollection('vs
 /**
  * 문서의 기본적인 구문 오류(들여쓰기, 콜론)를 검사합니다.
  */
-export function refreshDiagnostics(document: vscode.TextDocument): void {
+export function refreshDiagnostics(document: vscode.TextDocument, client: SkriptHubClient): void {
     const diagnostics: vscode.Diagnostic[] = [];
 
     const config = vscode.workspace.getConfiguration('vskript');
@@ -72,6 +73,26 @@ export function refreshDiagnostics(document: vscode.TextDocument): void {
                 diagnostics.push(new vscode.Diagnostic(
                     range,
                     "섹션의 끝에 콜론(':')이 누락되었습니다.",
+                    vscode.DiagnosticSeverity.Error
+                ));
+            }
+        }
+        // --- 3. 실시간 구문 오타(패턴 매칭) 검사 ---
+        // 사용자가 입력한 첫 단어를 추출합니다.
+        const firstWord = trimmedText.split(/\s+/)[0].toLowerCase();
+        
+        // 만약 인덱스 DB에 등록된 첫 단어(예: send, give)인데
+        // 패턴 매칭 엔진(findMatch)이 구문을 찾지 못했다면 오타나 문법 에러로 간주합니다.
+        // 단, 섹션 키워드(command, if 등)는 복합 구조이므로 이번 기본 매칭 검사에서 제외합니다.
+        if (!sectionKeywords.test(trimmedText)) {
+            const matchedSyntax = client.findMatch(trimmedText);
+            
+            if (!matchedSyntax) {
+                // 일치하는 구문이 없으므로 해당 줄 전체에 빨간 밑줄(Error)을 긋습니다.
+                const range = new vscode.Range(i, 0, i, originalText.length);
+                diagnostics.push(new vscode.Diagnostic(
+                    range,
+                    `[VSkript] 알 수 없거나 문법이 올바르지 않은 구문입니다: '${trimmedText}'`,
                     vscode.DiagnosticSeverity.Error
                 ));
             }
