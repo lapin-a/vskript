@@ -9,105 +9,115 @@ import { SkriptHubClient } from '../SkriptHubClient';
 export const skriptDiagnostics = vscode.languages.createDiagnosticCollection('vskript');
 
 /**
- * 문서의 기본적인 구문 오류(들여쓰기, 콜론)를 검사합니다.
+ * 문서의 기본적인 구문 오류(들여쓰기, 콜론, 구문 오타)를 검사합니다.
  */
 export function refreshDiagnostics(document: vscode.TextDocument, client: SkriptHubClient): void {
-    const diagnostics: vscode.Diagnostic[] = [];
+    try {
+        const diagnostics: vscode.Diagnostic[] = [];
 
-    const config = vscode.workspace.getConfiguration('vskript');
-    const isIndentCheckEnabled = config.get<boolean>('analyze.indentation', true);
-    const preferSpaces = config.get<boolean>('analyze.preferSpaces', false);
+        const config = vscode.workspace.getConfiguration('vskript');
+        const isIndentCheckEnabled = config.get<boolean>('analyze.indentation', true);
+        const preferSpaces = config.get<boolean>('analyze.preferSpaces', false);
+        
+        const sectionKeywords = /^(command|trigger|function|if|else|on)/i;
 
-    console.log(`[설정값 디버깅] 활성화: ${isIndentCheckEnabled}, 공백선호: ${preferSpaces}`);
-    
-    for (let i = 0; i < document.lineCount; i++) {
-        const line = document.lineAt(i);
-        const originalText = line.text;
-        const trimmedText = originalText.trim();
+        // 🌟 [밸런스 패치] 무조건 에러로 때리던 방식 대신, 확실한 핵심 기본 명령어들의 오타만 정밀 저격합니다.
+        const knownKeywords = ['set', 'loop', 'return', 'send', 'message', 'msg', 'give', 'drop', 'clear', 'delete', 'add', 'remove', 'replace', 'wait', 'stop', 'while', 'if', 'else'];
 
-        if (trimmedText.length === 0 || trimmedText.startsWith('#')) continue;
+        for (let i = 0; i < document.lineCount; i++) {
+            const line = document.lineAt(i);
+            const originalText = line.text;
+            const trimmedText = originalText.trim();
 
-        // --- 1. 들여쓰기 검사 ---
-        if (isIndentCheckEnabled) {
-            const indentMatch = originalText.match(/^\s+/);
-            if (indentMatch) {
-                const indent = indentMatch[0];
+            if (trimmedText.length === 0 || trimmedText.startsWith('#')) continue;
 
-                // 1-1. 혼용 검사
-                if (indent.includes('\t') && indent.includes(' ')) {
-                    const range = new vscode.Range(i, 0, i, indent.length);
-                    diagnostics.push(new vscode.Diagnostic(
-                        range,
-                        "들여쓰기에 탭과 공백이 혼용되었습니다.",
-                        vscode.DiagnosticSeverity.Warning
-                    ));
-                } 
-                // 1-2. 선호 방식(Tab vs Space) 검사
-                else {
-                    if (preferSpaces && indent.includes('\t')) {
+            // --- 1. 들여쓰기 검사 ---
+            if (isIndentCheckEnabled) {
+                const indentMatch = originalText.match(/^\s+/);
+                if (indentMatch) {
+                    const indent = indentMatch[0];
+
+                    if (indent.includes('\t') && indent.includes(' ')) {
                         const range = new vscode.Range(i, 0, i, indent.length);
                         diagnostics.push(new vscode.Diagnostic(
                             range,
-                            "설정에서 공백(Space) 들여쓰기를 권장하고 있습니다.",
+                            "들여쓰기에 탭과 공백이 혼용되었습니다.",
                             vscode.DiagnosticSeverity.Warning
                         ));
-                    } else if (!preferSpaces && indent.includes(' ')) {
-                        const range = new vscode.Range(i, 0, i, indent.length);
+                    } else {
+                        if (preferSpaces && indent.includes('\t')) {
+                            const range = new vscode.Range(i, 0, i, indent.length);
+                            diagnostics.push(new vscode.Diagnostic(
+                                range,
+                                "설정에서 공백(Space) 들여쓰기를 권장하고 있습니다.",
+                                vscode.DiagnosticSeverity.Warning
+                            ));
+                        } else if (!preferSpaces && indent.includes(' ')) {
+                            const range = new vscode.Range(i, 0, i, indent.length);
+                            diagnostics.push(new vscode.Diagnostic(
+                                range,
+                                "설정에서 탭(Tab) 들여쓰기를 권장하고 있습니다.",
+                                vscode.DiagnosticSeverity.Warning
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // --- 2. 콜론(:) 누락 검사 ---
+            if (sectionKeywords.test(trimmedText)) {
+                const textWithoutComment = trimmedText.split('#')[0].trim();
+
+                if (!textWithoutComment.endsWith(':')) {
+                    const range = new vscode.Range(i, 0, i, originalText.length);
+                    diagnostics.push(new vscode.Diagnostic(
+                        range,
+                        "섹션의 끝에 콜론(':')이 누락되었습니다.",
+                        vscode.DiagnosticSeverity.Error
+                    ));
+                }
+            } 
+            
+            // --- 3. 실시간 구문 오타 정밀 저격 검사 ---
+            else {
+                const firstWord = trimmedText.split(' ')[0].toLowerCase();
+                
+                // 유저가 입력한 첫 단어가 우리가 감지할 수 있는 유효 명령어 목록과 엇박자가 나거나,
+                // 오타(예: sends, retur, st)로 변질되었을 때만 예리하게 작동합니다!
+                if (!knownKeywords.includes(firstWord)) {
+                    const matchedSyntax = client.findMatch(trimmedText);
+                    
+                    if (!matchedSyntax) {
+                        const range = new vscode.Range(i, 0, i, originalText.length);
                         diagnostics.push(new vscode.Diagnostic(
                             range,
-                            "설정에서 탭(Tab) 들여쓰기를 권장하고 있습니다.",
-                            vscode.DiagnosticSeverity.Warning
+                            `[VSkript] 알 수 없거나 문법이 올바르지 않은 구문입니다: '${trimmedText}'`,
+                            vscode.DiagnosticSeverity.Error
                         ));
                     }
                 }
             }
         }
 
-        // --- 2. 콜론(:) 누락 검사 ---
-        const sectionKeywords = /^(command|trigger|function|if|else|on)/i;
-        if (sectionKeywords.test(trimmedText)) {
-            const textWithoutComment = trimmedText.split('#')[0].trim();
+        // 🌟 [진단 보관함 세팅 완료] 최종 방출
+        console.log(`📦 [진단 보관함 세팅 완료] 경로: ${document.uri.fsPath} | 빨간줄 개수: ${diagnostics.length}개`);
+        skriptDiagnostics.set(document.uri, diagnostics);
 
-            if (!textWithoutComment.endsWith(':')) {
-                const range = new vscode.Range(i, 0, i, originalText.length);
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    "섹션의 끝에 콜론(':')이 누락되었습니다.",
-                    vscode.DiagnosticSeverity.Error
-                ));
-            }
-        }
-        // --- 3. 실시간 구문 오타(패턴 매칭) 검사 ---
-        // 사용자가 입력한 첫 단어를 추출합니다.
-        const firstWord = trimmedText.split(/\s+/)[0].toLowerCase();
-        
-        // 만약 인덱스 DB에 등록된 첫 단어(예: send, give)인데
-        // 패턴 매칭 엔진(findMatch)이 구문을 찾지 못했다면 오타나 문법 에러로 간주합니다.
-        // 단, 섹션 키워드(command, if 등)는 복합 구조이므로 이번 기본 매칭 검사에서 제외합니다.
-        if (!sectionKeywords.test(trimmedText)) {
-            const matchedSyntax = client.findMatch(trimmedText);
-            
-            if (!matchedSyntax) {
-                // 일치하는 구문이 없으므로 해당 줄 전체에 빨간 밑줄(Error)을 긋습니다.
-                const range = new vscode.Range(i, 0, i, originalText.length);
-                diagnostics.push(new vscode.Diagnostic(
-                    range,
-                    `[VSkript] 알 수 없거나 문법이 올바르지 않은 구문입니다: '${trimmedText}'`,
-                    vscode.DiagnosticSeverity.Error
-                ));
-            }
-        }
+    } catch (error) {
+        console.error("🚨 refreshDiagnostics 실행 중 치명적 에러 발생:", error);
     }
-
-    skriptDiagnostics.set(document.uri, diagnostics);
 }
 
 /**
  * 버전 비교를 위한 유틸리티 함수
  */
-function isVersionCompatible(current: string, required: string): boolean {
-    const curr = current.split('.').map(Number);
-    const req = required.split('.').map(Number);
+function isVersionCompatible(current: string, required: any): boolean {
+    if (!required) return true;
+    const reqStr = String(required).trim();
+    const currStr = String(current).trim();
+
+    const curr = currStr.split('.').map(Number);
+    const req = reqStr.split('.').map(Number);
     
     for (let i = 0; i < Math.max(curr.length, req.length); i++) {
         const currVal = curr[i] || 0;
@@ -125,9 +135,10 @@ export function checkVersionCompatibility(document: SkriptDocument, versionData:
     const diagnostics: vscode.Diagnostic[] = [];
     const docVersion = document.version || "2.6"; 
 
-    // document.components (getter)를 통해 접근
+    if (!document.components) return diagnostics;
+
     document.components.forEach((comp: any) => { 
-        // SkriptComponent에 title이 없을 수 있으므로 안전하게 처리
+        if (!comp) return;
         const syntaxTitle = comp.title || ""; 
         const syntaxInfo = versionData[syntaxTitle]; 
         
