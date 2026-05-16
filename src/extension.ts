@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { ExtensionContext, IndentAction, languages, workspace } from 'vscode';
-import * as Skript from './skript_v0.0.7/Skript';
-import * as Provider from './skript_v0.0.7/provider/Provider';
-import TextDocumentChangeEvent from './skript_v0.0.7/event/TextDocumentChangeEvent';
-import { LEGEND } from './skript_v0.0.7/provider/SkriptDocumentSemanticTokensProvider';
-import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './skript_v0.0.7/provider/SkriptDiagnostics';
-import { SkriptHubClient } from './skript_v0.0.7/SkriptHubClient';
+import * as Skript from './Vskript/Skript';
+import * as Provider from './Vskript/provider/Provider';
+import TextDocumentChangeEvent from './Vskript/event/TextDocumentChangeEvent';
+import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
+import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
+import { SkriptHubClient } from './Vskript/SkriptHubClient';
 
 let hubClient: SkriptHubClient;
 
