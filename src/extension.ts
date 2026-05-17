@@ -85,8 +85,7 @@ export async function activate(context: ExtensionContext) {
         }),
 
         workspace.onDidChangeTextDocument(async (event) => {
-            // 🌟 [최적화 수정] 실시간 렉을 유발하던 중복 updateAllDiagnostics(event.document) 강제 호출부를 완전히 걷어냅니다!
-            // 이제 모든 타이핑 제어권은 디바운스 타이머가 내장된 TextDocumentChangeEvent 단 한 곳에서 통합 관리됩니다.
+            // 모든 타이핑 제어권은 디바운스 타이머가 내장된 TextDocumentChangeEvent 단 한 곳에서 통합 관리됩니다.
             TextDocumentChangeEvent(event, hubClient);
         }),
 
@@ -112,7 +111,8 @@ export async function activate(context: ExtensionContext) {
         languages.registerWorkspaceSymbolProvider(new Provider.SkriptWorkspaceSymbolProvider()),
         languages.registerHoverProvider('vskript', new Provider.SkriptHoverProvider()),
         languages.registerDefinitionProvider('vskript', new Provider.SkriptDefinitionProvider()),
-        languages.registerCompletionItemProvider('vskript', new Provider.SkriptCompletionItemProvider()),
+        // 🌟 [버그 수정 완료] 세 번째 매개변수 이후로 '{'와 '@' 기호를 강제 트리거 문자로 지정합니다!
+        languages.registerCompletionItemProvider('vskript', new Provider.SkriptCompletionItemProvider(), '{', '@'),
         languages.registerDocumentSemanticTokensProvider('vskript', new Provider.SkriptDocumentSemanticTokensProvider(), LEGEND),
         languages.registerColorProvider('vskript', new Provider.SkriptDocumentColorProvider())
     );
