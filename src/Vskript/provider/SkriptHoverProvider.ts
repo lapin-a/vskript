@@ -1,105 +1,130 @@
-import { Hover, HoverProvider, MarkdownString, Position, Range, TextDocument } from 'vscode';
+import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import * as Skript from "../Skript";
 
 /**
- * [2단계 Step 8] 호버(Hover) 안내 기능 제공자 (마크다운 가독성 개량 버전)
+ * [Step 9 고도화] 옵션 실시간 마크다운 팝업 가이드 및 호버 제공자
  */
-export class SkriptHoverProvider implements HoverProvider {
+export class SkriptHoverProvider implements vscode.HoverProvider {
 
-    public provideHover(document: TextDocument, position: Position) {
-        console.log(`=== 🟢 [vskript 호버] 마우스 호버 감지 시작! (라인: ${position.line}, 칸: ${position.character}) ===`);
+    public provideHover(document: vscode.TextDocument, position: vscode.Position) {
+        const lineText = document.lineAt(position.line).text;
 
-        const currentLineText = document.lineAt(position.line).text;
-        const charIdx = position.character;
-        const isWordChar = (ch: string) => /[a-zA-Z0-9_]/.test(ch);
+        // 🌟 [엔진 1] 옵션 패턴 정밀 포착: {@이름} 및 {@분류.이름} 형태 추적 (마침표 포함)
+        const optionRegex = /\{@([a-zA-Z0-9_\.]+)\}/g;
+        let match;
+        let targetOptionName: string | undefined = undefined;
+        let hoverRange: vscode.Range | undefined = undefined;
 
-        if (charIdx < 0 || charIdx > currentLineText.length) return null;
-
-        // 수동 단어 추출
-        let start = charIdx;
-        if (start > 0 && !isWordChar(currentLineText[start]) && isWordChar(currentLineText[start - 1])) {
-            start--;
-        }
-        while (start > 0 && isWordChar(currentLineText[start - 1])) {
-            start--;
-        }
-        let end = charIdx;
-        while (end < currentLineText.length && isWordChar(currentLineText[end])) {
-            end++;
+        while ((match = optionRegex.exec(lineText)) !== null) {
+            const startIdx = match.index;
+            const endIdx = optionRegex.lastIndex;
+            // 마우스 커서가 {@ ... } 문자열 영역 내부에 머물고 있는지 확인
+            if (position.character >= startIdx && position.character <= endIdx) {
+                targetOptionName = match[1];
+                hoverRange = new vscode.Range(position.line, startIdx, position.line, endIdx);
+                break;
+            }
         }
 
-        const word = currentLineText.substring(start, end).trim();
-        console.log(`🔍 [vskript 호버] 추출된 타겟 단어: [ ${word} ]`);
+        // ==========================================
+        // 🎯 [분기 A] 옵션 호버 팝업 출력 로직
+        // ==========================================
+        if (targetOptionName) {
+            // 옵션 정의 검출용 정규식 (ex: 이름: 값)
+            const optionDefRegex = new RegExp(`^\\s*${targetOptionName.replace(/\./g, '\\.')}\\s*:\\s*(.*)`, 'i');
+            let foundValue: string | undefined = undefined;
 
-        if (!word) return null;
+            // 1단계: 현재 파일 내부에서 옵션 정의문 우선 서치
+            for (let i = 0; i < document.lineCount; i++) {
+                const m = document.lineAt(i).text.match(optionDefRegex);
+                if (m) {
+                    foundValue = m[1].trim();
+                    break;
+                }
+            }
 
-        const hoverRange = new Range(new Position(position.line, start), new Position(position.line, end));
+            // 2단계: 파일 내에 없다면 메모리에 상주 중인 다른 .sk 파일 전수조사
+            if (!foundValue) {
+                for (const openDoc of vscode.workspace.textDocuments) {
+                    if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+                    for (let i = 0; i < openDoc.lineCount; i++) {
+                        const m = openDoc.lineAt(i).text.match(optionDefRegex);
+                        if (m) {
+                            foundValue = m[1].trim();
+                            break;
+                        }
+                    }
+                    if (foundValue) break;
+                }
+            }
 
-        // [케이스 A] 옵션 변수 호버 처리
-        const isOptionCall = currentLineText.substring(Math.max(0, start - 2), start) === '{@';
-        if (isOptionCall || currentLineText.includes(`{@${word}}`)) {
-            const fileLineCount = document.lineCount;
-            for (let i = 0; i < fileLineCount; i++) {
-                const text = document.lineAt(i).text.trim();
-                if (text.startsWith(`${word}:`) || text.replace(/\s+/g, '').startsWith(`${word}:`)) {
-                    const optionValue = text.substring(text.indexOf(':') + 1).trim();
-                    
-                    const md = new MarkdownString();
-                    md.appendMarkdown(`**💡 Vskript Option 정보**\n\n`);
-                    md.appendCodeblock(optionValue, 'vskript');
-                    return new Hover(md, hoverRange);
+            // 3단계: 디스크 상의 다른 인덱싱 파일 전수조사 (최후의 보루)
+            if (!foundValue) {
+                for (const skDoc of Skript.DOCUMENTS) {
+                    const fsPath = skDoc.skPath.fsPath;
+                    if (!fs.existsSync(fsPath)) continue;
+                    const content = fs.readFileSync(fsPath, 'utf-8');
+                    const lines = content.split(/\r?\n/);
+                    for (const line of lines) {
+                        const m = line.match(optionDefRegex);
+                        if (m) {
+                            foundValue = m[1].trim();
+                            break;
+                        }
+                    }
+                    if (foundValue) break;
+                }
+            }
+
+            // 값을 찾았다면 예쁜 마크다운 팝업 박스 빌드
+            if (foundValue) {
+                const md = new vscode.MarkdownString();
+                md.appendMarkdown(`### Option: **${targetOptionName}**\n`);
+                md.appendMarkdown(`---\n`);
+                md.appendCodeblock(foundValue, 'vskript');
+                return new vscode.Hover(md, hoverRange);
+            }
+            return null;
+        }
+
+        // ==========================================
+        // 🎯 [분기 B] 일반 단어 (커스텀 함수) 호버 가이드 로직 (기존 구조 최적화)
+        // ==========================================
+        const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z0-9_]+/);
+        if (!wordRange) return null;
+
+        const word = document.getText(wordRange).trim();
+
+        // 메모리 상주 파일에서 함수 선언부 매칭
+        const functionRegex = new RegExp(`^\\s*function\\s+${this.escapeRegExp(word)}\\b`, 'i');
+        
+        for (const openDoc of vscode.workspace.textDocuments) {
+            if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+            for (let i = 0; i < openDoc.lineCount; i++) {
+                const headerLine = openDoc.lineAt(i).text;
+                if (functionRegex.test(headerLine)) {
+                    return this._buildFunctionHover(headerLine, i, openDoc, wordRange);
                 }
             }
         }
 
-        // [케이스 B] 함수(Function) 호버 처리
-        const fileLineCount = document.lineCount;
-        for (let i = 0; i < fileLineCount; i++) {
-            const text = document.lineAt(i).text;
-            const functionRegex = new RegExp(`^\\s*function\\s+${this.escapeRegExp(word)}\\b`, 'i');
-
-            if (functionRegex.test(text)) {
-                return this._buildFunctionHover(text, i, document, hoverRange);
-            }
-        }
-
-        // 전역 캐시 배열 스캔 (외부 파일 함수 발견 시)
+        // 디스크 최소화 파일 매칭
         try {
-            const allDocs = Skript.DOCUMENTS;
-            if (allDocs && Array.isArray(allDocs)) {
-                for (const skDoc of allDocs) {
-                    if (!skDoc || !skDoc.skPath) continue;
-                    const fsPath = skDoc.skPath.fsPath;
-                    if (!fsPath || !fs.existsSync(fsPath)) continue;
+            for (const skDoc of Skript.DOCUMENTS) {
+                const fsPath = skDoc.skPath.fsPath;
+                if (!fs.existsSync(fsPath)) continue;
 
-                    const content = fs.readFileSync(fsPath, { encoding: 'utf-8' });
-                    const lines = content.split(/\r?\n/);
+                const content = fs.readFileSync(fsPath, { encoding: 'utf-8' });
+                const lines = content.split(/\r?\n/);
 
-                    for (let i = 0; i < lines.length; i++) {
-                        const functionRegex = new RegExp(`^\\s*function\\s+${this.escapeRegExp(word)}\\b`, 'i');
-                        if (functionRegex.test(lines[i])) {
-                            const md = new MarkdownString();
-                            md.appendCodeblock(lines[i].trim(), 'vskript');
-                            md.appendMarkdown(`\n---\n`);
-
-                            let commentContent = '';
-                            let nextLineIdx = i + 1;
-                            while (nextLineIdx < lines.length) {
-                                const nextLineText = lines[nextLineIdx].trim();
-                                if (nextLineText.startsWith('#>')) {
-                                    // ⭐ 마크다운 문법상 줄 끝에 공백 2칸('  \n')이 있어야 강제 줄바꿈이 일어납니다!
-                                    commentContent += nextLineText.substring(2).trim() + '  \n';
-                                    nextLineIdx++;
-                                } else if (nextLineText === '' || nextLineText.startsWith('#')) {
-                                    nextLineIdx++;
-                                } else {
-                                    break;
-                                }
-                            }
-                            md.appendMarkdown(commentContent || `*작성된 Hover 가이드 문서가 없습니다.*`);
-                            return new Hover(md, hoverRange);
-                        }
+                for (let i = 0; i < lines.length; i++) {
+                    if (functionRegex.test(lines[i])) {
+                        const md = new vscode.MarkdownString();
+                        md.appendCodeblock(lines[i].trim(), 'vskript');
+                        md.appendMarkdown(`\n---\n*원격 인덱스 파일에서 로드됨: ${path.basename(fsPath)}*`);
+                        return new vscode.Hover(md, wordRange);
                     }
                 }
             }
@@ -110,11 +135,8 @@ export class SkriptHoverProvider implements HoverProvider {
         return null;
     }
 
-    /**
-     * 함수 설명 주석 수집 및 호버 객체 빌드
-     */
-    private _buildFunctionHover(headerLine: string, lineIdx: number, document: TextDocument, range: Range): Hover {
-        const md = new MarkdownString();
+    private _buildFunctionHover(headerLine: string, lineIdx: number, document: vscode.TextDocument, range: vscode.Range): vscode.Hover {
+        const md = new vscode.MarkdownString();
         md.appendCodeblock(headerLine.trim(), 'vskript');
         md.appendMarkdown(`\n---\n`);
 
@@ -125,7 +147,6 @@ export class SkriptHoverProvider implements HoverProvider {
         while (nextLineIdx < totalLines) {
             const nextLineText = document.lineAt(nextLineIdx).text.trim();
             if (nextLineText.startsWith('#>')) {
-                // ⭐ 개별 가이드라인 끝에 스페이스바 2칸('  \n')을 확보하여 가독성을 높입니다.
                 commentContent += nextLineText.substring(2).trim() + '  \n';
                 nextLineIdx++;
             } else if (nextLineText === '' || nextLineText.startsWith('#')) {
@@ -135,11 +156,11 @@ export class SkriptHoverProvider implements HoverProvider {
             }
         }
 
-        md.appendMarkdown(commentContent || `*작성된 Hover 가이드 문서가 없습니다.*`);
-        return new Hover(md, range);
+        md.appendMarkdown(commentContent || `*작성된 Hover 주석 가이드가 없습니다.*`);
+        return new vscode.Hover(md, range);
     }
 
-    private escapeRegExp(string: string): string {
+    private escapeRegExp(string: string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 }
