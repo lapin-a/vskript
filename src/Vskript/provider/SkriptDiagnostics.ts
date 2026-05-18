@@ -6,6 +6,9 @@ export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vs
 
 let extensionRootPath: string = '';
 
+/**
+ * extension.ts에서 활성화 시점에 주입해 주는 전역 확장 프로그램 루트 경로
+ */
 export function setExtensionRootPath(rootPath: string) {
     extensionRootPath = rootPath;
 }
@@ -28,13 +31,12 @@ function parseScriptVersionFromText(document: vscode.TextDocument): string | nul
 
 /**
  * [철벽 정제형 버전 비교 알고리즘]
- * 문자열 뒤에 붙은 부가 설명문과 대소문자를 싹 다 날려버리고 오직 버전 '숫자'와 '점'만 추출해 정밀 대조합니다.
  */
 function compareVersions(v1: any, v2: any): number {
-    const cleanV1 = String(v1 || '2.6').replace(/[^\d.]/g, '');
+    const cleanV1 = String(v1 || '2.7').replace(/[^\d.]/g, '');
     const cleanV2 = String(v2 || '1.0').replace(/[^\d.]/g, '');
 
-    const finalV1 = cleanV1 === '' ? '2.6' : cleanV1;
+    const finalV1 = cleanV1 === '' ? '2.7' : cleanV1;
     const finalV2 = cleanV2 === '' ? '1.0' : cleanV2;
 
     const p1 = finalV1.split('.').map(Number);
@@ -49,6 +51,9 @@ function compareVersions(v1: any, v2: any): number {
     return 0;
 }
 
+/**
+ * 들여쓰기 무결점 검사 레이어
+ */
 function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[] {
     const diagnostics: vscode.Diagnostic[] = [];
     const lineCount = document.lineCount;
@@ -97,6 +102,9 @@ function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[]
     return diagnostics;
 }
 
+/**
+ * 핵심 실시간 진단 실행 엔진
+ */
 export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any) {
     if (!document) return;
 
@@ -104,8 +112,8 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
         const entries: vscode.Diagnostic[] = [];
         const lineCount = document.lineCount;
 
-        // 🌟 [객체 트랩 완벽 분쇄 프로세스]
-        let currentVersion = '2.6';
+        // 🌟 [버전 객체 트랩 분쇄]
+        let currentVersion = '2.7';
         const scriptTopVersion = parseScriptVersionFromText(document);
         
         if (scriptTopVersion) {
@@ -114,10 +122,9 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
             try {
                 const syncData = hubClient.getSyncData();
                 if (syncData && syncData.version) {
-                    // 내부 객체 속성까지 딥 스캔하여 문자열 추출
                     const rawV = syncData.version;
                     if (typeof rawV === 'object') {
-                        currentVersion = rawV.version || rawV.name || (rawV.major !== undefined ? `${rawV.major}.${rawV.minor || 0}` : '2.6');
+                        currentVersion = rawV.version || rawV.name || (rawV.major !== undefined ? `${rawV.major}.${rawV.minor || 0}` : '2.7');
                     } else {
                         currentVersion = String(rawV);
                     }
@@ -125,31 +132,34 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
             } catch (e) {}
         }
 
-        // 혹시 모를 찌꺼기 문자 차단
         currentVersion = String(currentVersion).replace(/[^\d.]/g, '');
         if (currentVersion === '' || currentVersion.includes('object')) {
-            currentVersion = '2.6';
+            currentVersion = '2.7';
         }
 
-        let syntaxPath = path.join(extensionRootPath, 'src', 'resource', 'core_syntax.json');
+        // 🌟 [핵심 수술 부위: 절대 경로 락 패치 완료]
+        // copyfiles 빌드 파이프라인 구조와 100% 동기화되도록 out 폴더 소스를 정밀 타겟팅합니다.
+        let syntaxPath = path.join(extensionRootPath, 'out', 'resource', 'core_syntax.json');
+        
+        // 로컬 개발 디버깅(F5) 시 out 폴더가 미처 갱신 안 되었을 때를 위한 유연한 보조 감지선만 유지
         if (!fs.existsSync(syntaxPath)) {
-             syntaxPath = path.join(__dirname, '..', '..', '..', 'src', 'resource', 'core_syntax.json');
+            syntaxPath = path.join(extensionRootPath, 'src', 'resource', 'core_syntax.json');
         }
         
         let fileExists = fs.existsSync(syntaxPath);
         let syntaxDb: any = null;
-        let loadStatusText = '파일이 존재하지 않음';
+        let loadStatusText = '🚨 core_syntax.json 파일 유실됨';
 
         if (fileExists) {
             try {
                 syntaxDb = JSON.parse(fs.readFileSync(syntaxPath, 'utf-8'));
-                loadStatusText = '성공 (원본 데이터 매칭 준비완료)';
+                loadStatusText = '🟢 성공 (자원 바인딩 락 완료)';
             } catch (jsonErr: any) {
-                loadStatusText = `❌ JSON 문법 에러 발생: ${jsonErr.message}`;
+                loadStatusText = `❌ JSON 문법 에러: ${jsonErr.message}`;
             }
         }
 
-        console.log(`🔍 [vskript 디버그] 경로: ${syntaxPath} | 버전규격: v${currentVersion} | 상태: ${loadStatusText}`);
+        console.log(`[Vskript] 진단 데이터 락 경로: ${path.basename(syntaxPath)} | 규격: v${currentVersion} | 결과: ${loadStatusText}`);
 
         for (let i = 0; i < lineCount; i++) {
             const line = document.lineAt(i);
@@ -173,21 +183,16 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
                 ));
             }
 
-            // 2️⃣ [철벽 차단형 버전 호환성 검사]
+            // 2️⃣ [버전 호환성 정밀 매칭 검사]
             if (syntaxDb) {
                 for (const key in syntaxDb) {
                     const syntax = syntaxDb[key];
                     if (!syntax || !syntax.name || !syntax.type || !syntax.patterns) continue;
 
-                    // 문자열 찌꺼기가 섞인 버전 텍스트 정제 (ex: "1.0 (simple disconnection)" -> "1.0")
                     const rawAdded = String(syntax.added && syntax.added[0] ? syntax.added[0] : "1.0");
                     const requiredVersion = rawAdded.replace(/[^\d.]/g, '') || "1.0";
 
                     if (compareVersions(currentVersion, requiredVersion) < 0) {
-                        
-                        // 🌟 [교차 오탐지 검사선 구축]
-                        // 사용자가 적은 라인이 'on '으로 시작하면 'event' 타입 구문만 매칭합니다.
-                        // 이 필터 덕분에 "on load"가 엉뚱한 2.7버전의 "load script" 이펙트와 매칭되어 노란줄이 뜨는 참사를 막습니다.
                         const sType = String(syntax.type).toLowerCase();
                         if (sType === 'event' && !lowerText.startsWith('on ')) continue;
                         if (sType === 'command' && !lowerText.startsWith('command ')) continue;
@@ -195,15 +200,14 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
                         const cleanLowerInput = lowerText.replace(/:$/, '').trim();
                         let isMatched = false;
                         
-                        // 정밀 정규식 빌드로 매칭 정확도 극대화
                         for (const pattern of syntax.patterns) {
                             if (!pattern) continue;
                             
                             const safeRegexStr = pattern
-                                .replace(/[-\/\\^$*+?.{}]/g, '\\$&') // 특수문자 이스케이프
-                                .replace(/%[^%]+%/g, '.+?')           // 변수 패턴 와일드카드화
-                                .replace(/<[^>]+>/g, '.+?')           // 표현식 패턴 와일드카드화
-                                .replace(/\[([^\]]+)\]/g, '(?:$1)?'); // 대괄호 옵션 처리
+                                .replace(/[-\/\\^$*+?.{}]/g, '\\$&')
+                                .replace(/%[^%]+%/g, '.+?') 
+                                .replace(/<[^>]+>/g, '.+?') 
+                                .replace(/\[([^\]]+)\]/g, '(?:$1)?'); 
                             
                             try {
                                 const finalRegexStr = sType === 'event' ? `^${safeRegexStr}` : `\\b${safeRegexStr}`;
@@ -236,6 +240,6 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
         skriptDiagnostics.set(document.uri, entries);
 
     } catch (error) {
-        console.error("🚨 [SkriptDiagnostics.ts] 예외 발생:", error);
+        console.error("🚨 [SkriptDiagnostics.ts] 최종 예외 방어선 붕괴:", error);
     }
 }
