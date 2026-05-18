@@ -2,6 +2,7 @@ import { MarkdownString, Position, Range, SymbolKind } from "vscode";
 import { SkriptType } from "./language/SkriptType";
 import { SkriptDocument, SkriptLine } from "./SkriptDocument";
 import { SkriptParagraph } from "./SkriptParagraph";
+import * as Path from 'path';
 
 export interface SkriptKeyValue<T> {
 	range: Range,
@@ -426,7 +427,10 @@ export class SkriptToolTip {
 				docs.push('');
 				this._markdown.appendMarkdown(docs.join('  \r\n'));
 			}
-			this._markdown.appendMarkdown(['***', 'from ```' + this._skParagraph.document.skPath.name + '```'].join('  \r\n'))
+			this._markdown.appendMarkdown([
+    			'***', 
+    			'from ```' + Path.basename(this._skParagraph.document.skPath.fsPath) + '```'
+			].join('  \r\n'));
 		}
 		return this._markdown;
 	}
