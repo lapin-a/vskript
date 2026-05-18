@@ -1,51 +1,43 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as Skript from '../Skript';
+import * as path from 'path';
 
 /**
- * [2단계 Step 9] 자동 완성(Completion Item) 제공자 (필터 우회 최종판)
+ * [Step 9 무결점 고도화] 엄격모드 규격 반영 자동완성 엔진
  */
 export class SkriptCompletionItemProvider implements vscode.CompletionItemProvider {
     
     public provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-        token: vscode.CancellationToken,
-        context: vscode.CompletionContext
+        _token: vscode.CancellationToken,  // 🌟 [Strict 방어] 사용하지 않는 매개변수 접두사(_) 처리
+        _context: vscode.CompletionContext // 🌟 [Strict 방어] 사용하지 않는 매개변수 접두사(_) 처리
     ): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList> {
         
-        console.log(`=== 🔵 [vskript 자동완성] 작동 개시! 트리거 사유 유형: ${context.triggerKind} (입력 캐릭터: ${context.triggerCharacter}) ===`);
-
         const completionItems: vscode.CompletionItem[] = [];
         const currentLineText = document.lineAt(position.line).text;
         const linePrefix = currentLineText.substring(0, position.character);
-        const fileLineCount = document.lineCount;
 
-        // 1. 수동 단어 범위 계산
+        // VS Code 설정에서 언어 가져오기
+        const userLanguage = vscode.workspace.getConfiguration('vskript').get<string>('language') || 'en';
+
+        // 스크립트 버전 파싱
+        const currentScriptVersion = this.parseScriptVersion(document);
+
+        // 중복 입력 방지 범위 계산
         const isWordChar = (ch: string) => /[a-zA-Z0-9_]/.test(ch);
         let wordStart = position.character;
         while (wordStart > 0 && isWordChar(currentLineText[wordStart - 1])) {
             wordStart--;
         }
+        const keywordRange = new vscode.Range(position.line, wordStart, position.line, position.character);
 
-        let keywordRange = new vscode.Range(position.line, wordStart, position.line, position.character);
-        if (wordStart >= 3 && currentLineText.substring(wordStart - 3, wordStart).toLowerCase() === 'on ') {
-            keywordRange = new vscode.Range(position.line, wordStart - 3, position.line, position.character);
-        } else if (wordStart >= 8 && currentLineText.substring(wordStart - 8, wordStart).toLowerCase() === 'command ') {
-            keywordRange = new vscode.Range(position.line, wordStart - 8, position.line, position.character);
-        }
-
+        // 기본 내장 키워드 주입
         const coreKeywords = [
-            { label: 'on load:', detail: '이벤트: 스크립트가 로드될 때 실행' },
-            { label: 'on join:', detail: '이벤트: 플레이어가 서버에 접속할 때 실행' },
-            { label: 'command /', detail: '명령어: 새로운 명령어 정의 블록 생성' },
-            { label: 'trigger:', detail: '구문: 명령어 실행부 블록 시작' },
-            { label: 'broadcast ', detail: '이펙트: 서버 전체에 메시지 공지' },
-            { label: 'send ', detail: '이펙트: 특정 대상에게 메시지 전송' },
-            { label: 'cancel event', detail: '이펙트: 현재 이벤트 발생을 취소' },
-            { label: 'stop', detail: '구문: 코드 실행을 즉시 중단' }
+            { label: 'on load:', detail: '이벤트: 스크립트 로드 시 실행' },
+            { label: 'command /', detail: '명령어: 신규 커맨드 정의' },
+            { label: 'trigger:', detail: '구문: 명령어 실행 블록 시작' }
         ];
-
         coreKeywords.forEach(kw => {
             const item = new vscode.CompletionItem(kw.label, vscode.CompletionItemKind.Keyword);
             item.detail = kw.detail;
@@ -53,92 +45,146 @@ export class SkriptCompletionItemProvider implements vscode.CompletionItemProvid
             completionItems.push(item);
         });
 
-
-        // 2. [옵션 영역] VS Code 필터 강제 우회 및 자동 닫힘 괄호 파괴 알고리즘
-        const optionMatch = linePrefix.match(/\{@([a-zA-Z0-9_]*)$/i);
-        console.log(`🔍 [vskript 자동완성] 현재 라인 문자열: "${linePrefix}" | 옵션 매칭 성공 여부: ${!!optionMatch}`);
-
-        const foundOptions: { key: string, value: string }[] = [];
-        for (let i = 0; i < fileLineCount; i++) {
-            const text = document.lineAt(i).text.trim();
-            if (text.startsWith('#')) continue;
-
-            if (text.includes(':') && !text.startsWith('function') && !text.startsWith('on ') && !text.startsWith('command') && !text.endsWith(':')) {
-                const parts = text.split(':');
-                const key = parts[0].trim();
-                if (key && /^[a-zA-Z0-9_]+$/.test(key)) {
-                    const val = parts.slice(1).join(':').trim();
-                    foundOptions.push({ key, value: val });
-                }
-            }
-        }
-        
-        console.log(`⚙️ [vskript 자동완성] 현재 스크립트 파일 안에서 추출해낸 총 옵션 변수 개수: ${foundOptions.length}개`);
-
-        if (optionMatch) {
-            const typedText = optionMatch[1];
-            const startChar = position.character - typedText.length - 2; 
-            
-            let endChar = position.character;
-            if (endChar < currentLineText.length && currentLineText[endChar] === '}') {
-                endChar++; 
-            }
-
-            const optionRange = new vscode.Range(position.line, startChar, position.line, endChar);
-
-            foundOptions.forEach(opt => {
-                const item = new vscode.CompletionItem(`{@${opt.key}}`, vscode.CompletionItemKind.Variable);
-                item.detail = `Option 변수 값: ${opt.value}`;
-                item.documentation = new vscode.MarkdownString(`현재 파일의 \`options:\` 세션 값인 \`${opt.value}\`을 불러옵니다.`);
-                
-                item.range = optionRange; 
-                item.insertText = `{@${opt.key}}`;
-                
-                // ⭐ [핵심 치트키] VS Code가 특수문자 기호 때문에 목록을 숨기지 못하도록 필터 텍스트를 강제 수동 동기화합니다!
-                item.filterText = `{@${opt.key}`; 
-                
-                completionItems.push(item);
-            });
-        } else {
-            foundOptions.forEach(opt => {
-                const item = new vscode.CompletionItem(`{@${opt.key}}`, vscode.CompletionItemKind.Variable);
-                item.detail = `Option 변수 값: ${opt.value}`;
-                completionItems.push(item);
-            });
-        }
-
-
-        // 3. [함수 영역] 전역 함수 수집 및 추천
+        // core_syntax.json 공식 구문 처리
         try {
-            const allDocs = Skript.DOCUMENTS;
-            if (allDocs && Array.isArray(allDocs)) {
-                const uniqueFunctions = new Set<string>();
-                for (const skDoc of allDocs) {
-                    if (!skDoc || !skDoc.skPath) continue;
-                    const fsPath = skDoc.skPath.fsPath;
-                    if (!fsPath || !fs.existsSync(fsPath)) continue;
+            // 🌟 [소문자 ID 및 다중 경로 추적] 컴파일 깊이와 관계없이 데이터를 완벽히 추적합니다.
+            const extension = vscode.extensions.getExtension('vhone.vskript');
+            const rootPath = extension ? extension.extensionPath : '';
+            
+            let syntaxPath = path.join(rootPath, 'core_syntax.json');
+            let koDictPath = path.join(rootPath, 'assets', 'ko_dict.json');
+            
+            if (!rootPath || !fs.existsSync(syntaxPath)) {
+                syntaxPath = path.join(__dirname, '..', '..', '..', 'core_syntax.json');
+                koDictPath = path.join(__dirname, '..', '..', '..', 'assets', 'ko_dict.json');
+            }
+            if (!fs.existsSync(syntaxPath)) {
+                syntaxPath = path.join(__dirname, '..', '..', 'core_syntax.json');
+                koDictPath = path.join(__dirname, '..', '..', 'assets', 'ko_dict.json');
+            }
 
-                    const content = fs.readFileSync(fsPath, { encoding: 'utf-8' });
-                    const lines = content.split(/\r?\n/);
-                    for (const line of lines) {
-                        const match = line.match(/^\s*function\s+([a-zA-Z0-9_]+)\b/i);
-                        if (match && match[1]) {
-                            uniqueFunctions.add(match[1]);
-                        }
-                    }
+            if (fs.existsSync(syntaxPath)) {
+                const syntaxDb = JSON.parse(fs.readFileSync(syntaxPath, 'utf-8')) as Record<string, any>;
+                
+                let koDict: Record<string, string> = {};
+                if (fs.existsSync(koDictPath)) {
+                    koDict = JSON.parse(fs.readFileSync(koDictPath, 'utf-8')) as Record<string, string>;
                 }
-                uniqueFunctions.forEach(funcName => {
-                    const item = new vscode.CompletionItem(`${funcName}`, vscode.CompletionItemKind.Function);
-                    item.detail = `vskript 프로젝트 정의 함수`;
-                    item.insertText = new vscode.SnippetString(`${funcName}(\${1})`);
-                    completionItems.push(item);
-                });
+
+                for (const key in syntaxDb) {
+                    const syntax = syntaxDb[key];
+                    if (!syntax || !syntax.patterns) continue;
+
+                    // 버전 필터링 대조
+                    const requiredVersion = (syntax.added && syntax.added[0]) ? String(syntax.added[0]) : "1.0";
+                    if (!this.isVersionCompatible(currentScriptVersion, requiredVersion)) {
+                        continue; 
+                    }
+
+                    syntax.patterns.forEach((pattern: string) => {
+                        const cleanLabel = pattern.replace(/[\[\]\^]/g, '').replace(/\(.+?\)/g, '').replace(/<.+?>/g, '...');
+                        const item = new vscode.CompletionItem(cleanLabel, this.getKindByType(String(syntax.type)));
+                        
+                        item.detail = `[${String(syntax.type).toUpperCase()}] v${requiredVersion}+`;
+                        
+                        // 다국어 폴백 매트릭스 툴팁 빌드
+                        const md = new vscode.MarkdownString();
+                        md.appendMarkdown(`### 🛠️ Skript Core Syntax\n\n`);
+                        md.appendMarkdown(`- **Name:** \`${String(syntax.name)}\`\n`);
+                        md.appendMarkdown(`- **Addon:** \`${String(syntax.addon)}\`\n\n`);
+                        md.appendMarkdown(`---\n\n`);
+
+                        let descriptionText = "";
+
+                        if (userLanguage === 'ko') {
+                            if (koDict[syntax.name]) {
+                                descriptionText = koDict[syntax.name]; 
+                            } else if (syntax.description && syntax.description.ko) {
+                                descriptionText = String(syntax.description.ko); 
+                            } else if (syntax.description && syntax.description.en) {
+                                descriptionText = Array.isArray(syntax.description.en) ? syntax.description.en.join('\n') : String(syntax.description.en); 
+                            }
+                        } else {
+                            if (syntax.description && syntax.description.en) {
+                                descriptionText = Array.isArray(syntax.description.en) ? syntax.description.en.join('\n') : String(syntax.description.en);
+                            }
+                        }
+
+                        md.appendMarkdown(`**📢 Description:**\n${descriptionText}\n`);
+                        item.documentation = md;
+                        completionItems.push(item);
+                    });
+                }
             }
         } catch (error) {
-            console.error("🚨 [SkriptCompletionItemProvider] 전역 함수 수집 오류:", error);
+            console.error("🚨 [SkriptCompletionItemProvider] 에러:", error);
         }
 
-        console.log(`🚀 [vskript 자동완성] 최종 반환할 총 리스트 개수: ${completionItems.length}개`);
+        // 옵션 변수({@옵션}) 추천 영역
+        const optionMatch = linePrefix.match(/\{@([a-zA-Z0-9_]*)$/i);
+        if (optionMatch) {
+            const typedText = optionMatch[1];
+            const startChar = position.character - typedText.length - 2;
+            let endChar = position.character;
+            if (endChar < currentLineText.length && currentLineText[endChar] === '}') endChar++;
+
+            const optionRange = new vscode.Range(position.line, startChar, position.line, endChar);
+            
+            for (let i = 0; i < document.lineCount; i++) {
+                const text = document.lineAt(i).text.trim();
+                if (text.includes(':') && !text.startsWith('function') && !text.startsWith('on ') && !text.endsWith(':')) {
+                    const parts = text.split(':');
+                    const key = parts[0].trim();
+                    if (key && /^[a-zA-Z0-9_]+$/.test(key)) {
+                        const item = new vscode.CompletionItem(`{@${key}}`, vscode.CompletionItemKind.Variable);
+                        item.detail = `Option 변수 값: ${parts.slice(1).join(':').trim()}`;
+                        item.range = optionRange;
+                        item.insertText = `{@${key}}`;
+                        item.filterText = `{@${key}`;
+                        completionItems.push(item);
+                    }
+                }
+            }
+        }
+
         return completionItems;
+    }
+
+    private parseScriptVersion(document: vscode.TextDocument): string {
+        const scanLines = Math.min(document.lineCount, 10);
+        for (let i = 0; i < scanLines; i++) {
+            const text = document.lineAt(i).text;
+            const match = text.match(/^\s*#\s*(?:version|v)\s*:\s*([0-9.]+)/i);
+            if (match && match[1]) {
+                return match[1].trim();
+            }
+        }
+        return "2.7"; 
+    }
+
+    private isVersionCompatible(current: string, required: string): boolean {
+        const reqMatch = required.match(/([0-9.]+)/);
+        if (!reqMatch) return true;
+
+        const currentParts = current.split('.').map(Number);
+        const requiredParts = reqMatch[1].split('.').map(Number);
+
+        for (let i = 0; i < Math.max(currentParts.length, requiredParts.length); i++) {
+            const c = currentParts[i] || 0;
+            const r = requiredParts[i] || 0;
+            if (c > r) return true;
+            if (c < r) return false;
+        }
+        return true;
+    }
+
+    private getKindByType(type: string): vscode.CompletionItemKind {
+        switch (type?.toLowerCase()) {
+            case 'event': return vscode.CompletionItemKind.Event;
+            case 'section': return vscode.CompletionItemKind.Struct;
+            case 'effect': return vscode.CompletionItemKind.Method;
+            case 'condition': return vscode.CompletionItemKind.TypeParameter;
+            default: return vscode.CompletionItemKind.Property;
+        }
     }
 }
