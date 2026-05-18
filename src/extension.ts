@@ -11,33 +11,38 @@ import { SkriptHubClient } from './Vskript/SkriptHubClient';
 
 let hubClient: SkriptHubClient;
 
+/**
+ * [최적화] 진단 연산을 비동기로 격리하여 메인 UI 스레드 프리징을 원천 차단합니다.
+ */
 export function updateAllDiagnostics(document: vscode.TextDocument) {
     if (!document) return;
     const isSkFile = document.uri.fsPath.endsWith('.sk');
     const isVSkriptLanguage = document.languageId === 'vskript';
     if (!isSkFile && !isVSkriptLanguage) return;
 
-    try {
-        const finalDiagnostics: vscode.Diagnostic[] = [];
-        refreshDiagnostics(document, hubClient);
-        const syntaxEntries = skriptDiagnostics.get(document.uri) || [];
-        finalDiagnostics.push(...syntaxEntries);
-        
-        const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
-        const skDoc = Skript.find(fsPath);
-        if (skDoc && hubClient) {
-            const versionIssues = checkVersionCompatibility(skDoc, hubClient.getSyncData());
-            finalDiagnostics.push(...versionIssues);
+    // 🌟 [핵심] 무거운 정규식 진단 연산을 비동기 큐로 빼서 파일 오픈/전환 렉을 완전히 소멸시킵니다.
+    setTimeout(() => {
+        try {
+            const finalDiagnostics: vscode.Diagnostic[] = [];
+            refreshDiagnostics(document, hubClient);
+            const syntaxEntries = skriptDiagnostics.get(document.uri) || [];
+            finalDiagnostics.push(...syntaxEntries);
+            
+            const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
+            const skDoc = Skript.find(fsPath);
+            if (skDoc && hubClient) {
+                const versionIssues = checkVersionCompatibility(skDoc, hubClient.getSyncData());
+                finalDiagnostics.push(...versionIssues);
+            }
+            skriptDiagnostics.set(document.uri, finalDiagnostics);
+        } catch (error) {
+            console.error("🚨 [extension.ts] updateAllDiagnostics 에러 방어:", error);
         }
-        skriptDiagnostics.set(document.uri, finalDiagnostics);
-    } catch (error) {
-        console.error("🚨 [extension.ts] updateAllDiagnostics 에러 방어:", error);
-    }
+    }, 5); // 5ms의 미세 지연을 주어 에디터 화면 렌더링 및 포커스가 먼저 완료되도록 유도
 }
 
 export async function activate(context: ExtensionContext) {
     // 🌟 [런타임 로그 선점 하이재킹] 
-    // 컴파일러의 간섭을 물리적으로 불가능하게 만들기 위해 activate 기동 즉시 순정 콘솔을 후킹합니다.
     const originalLog = console.log;
     const originalInfo = console.info;
 
@@ -45,11 +50,10 @@ export async function activate(context: ExtensionContext) {
         const fullLogMessage = args.map(a => String(a)).join(' ');
         
         if (fullLogMessage.includes('[즉시 스캔 완료]') || fullLogMessage.includes('[데이터 업데이트]') || fullLogMessage.includes('초고속 최적화 성공')) {
-            // 경로 기호(\, /)를 기준으로 문장 맨 끝의 순수 .sk 파일명만 낚아챕니다. (공백 완벽 지원)
             const fileMatch = fullLogMessage.match(/([^\\\/]+\.sk)/i);
             if (fileMatch && fileMatch[1]) {
                 const fileName = fileMatch[1].trim();
-                if (fileName.startsWith('-')) return; // 하이픈 비활성화 파일 출력 원천 차단
+                if (fileName.startsWith('-')) return; 
                 
                 if (fullLogMessage.includes('[즉시 스캔 완료]')) {
                     originalFn(`[즉시 스캔 완료] ${fileName}`);
@@ -81,7 +85,6 @@ export async function activate(context: ExtensionContext) {
         comments: { lineComment: '#' }
     });
 
-    // 이제 1등으로 주입된 위의 가로채기 엔진이 아래 초기 스캔 로그들을 완벽하게 필터링합니다.
     await Skript.onSkriptEnable();
 
     const activeEditor = vscode.window.activeTextEditor;
@@ -118,7 +121,10 @@ export async function activate(context: ExtensionContext) {
                 const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
                 let skDocument = Skript.find(fsPath);
                 if (!skDocument) skDocument = Skript.scanSingleFile(document.uri);
+                
+                // 비동기로 격리된 진단 연산 호출
                 updateAllDiagnostics(document);
+                
                 setTimeout(() => {
                     vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', document.uri);
                 }, 150);
