@@ -1,0 +1,96 @@
+{
+  "TuSKe:open_virtual_chest": {
+    "name": "open virtual chest",
+    "added": ["1.1.0"],
+    "addon": "TuSKe",
+    "type": "effect",
+    "patterns": [
+      "open virtual [chest] [inventory] [with] size %number% [named %string%] to %players%",
+      "open virtual [chest] [inventory] [with] %number% row[s] [named %string%] to %players%"
+    ],
+    "description": {
+      "en": "Opens a Virtual Chest Inventory provided by TuSKe addon.",
+      "ko": "TuSKe 구문입니다: 가상 상자 인벤토리(GUI) 창을 플레이어에게 오픈합니다."
+    }
+  },
+  "TuSKe:format_gui_slot": {
+    "name": "format gui slot",
+    "added": ["1.1.0"],
+    "addon": "TuSKe",
+    "type": "effect",
+    "patterns": [
+      "format gui slot %number% of %player% with %itemstack% to [run|close|keep]"
+    ],
+    "description": {
+      "en": "Formats an advanced virtual GUI slot using TuSKe engine.",
+      "ko": "TuSKe 구문입니다: 가상 상자의 특정 슬롯을 아이템으로 지정하고 클릭 액션을 바인딩합니다."
+    }
+  },
+  "SkQuery:format_slot": {
+    "name": "format slot",
+    "added": ["3.0"],
+    "addon": "SkQuery",
+    "type": "effect",
+    "patterns": [
+      "format slot %number% of %player% with %itemstack% to [close|run|keep] [...]"
+    ],
+    "description": {
+      "en": "Legacy GUI slot formatting statement from SkQuery.",
+      "ko": "SkQuery 구문입니다: 레가시 인벤토리 슬롯을 포맷하고 람다식(Close/Run/Keep) 명령을 연결합니다."
+    }
+  },
+  "SkQuery:open_chest": {
+    "name": "open chest",
+    "added": ["3.0"],
+    "addon": "SkQuery",
+    "type": "effect",
+    "patterns": [
+      "open chest with %number% rows named %string% to %player%"
+    ],
+    "description": {
+      "en": "Legacy inventory window opener syntax from SkQuery.",
+      "ko": "SkQuery 구문입니다: 지정된 행(Rows) 크기와 이름을 가진 상자 창을 엽니다."
+    }
+  },
+  "Skellett:tag_nbt": {
+    "name": "tag of nbt",
+    "added": ["1.9.0"],
+    "addon": "Skellett",
+    "type": "expression",
+    "patterns": [
+      "tag %string% of nbt of %entity%",
+      "nbt tag %string% of %entity%"
+    ],
+    "description": {
+      "en": "Retrieves or modifies a specific NBT compound tag of an entity using Skellett.",
+      "ko": "Skellett 구문입니다: 엔티티의 숨겨진 고급 데이터(NBT Tag)를 조회하거나 변경합니다."
+    }
+  },
+  "SkRayFall:send_title": {
+    "name": "send title",
+    "added": ["1.0"],
+    "addon": "SkRayFall",
+    "type": "effect",
+    "patterns": [
+      "send title %string% with subtitle %string% to %player% for %number% second[s]"
+    ],
+    "description": {
+      "en": "Displays a large central Title and Subtitle to a player via SkRayFall.",
+      "ko": "SkRayFall 구문입니다: 플레이어 화면 중앙에 타이틀과 서브타이틀 제목을 출력합니다."
+    }
+  },
+  "SkUtilities:file_read": {
+    "name": "read file",
+    "added": ["0.1"],
+    "addon": "SkUtilities",
+    "type": "expression",
+    "patterns": [
+      "lines of file %string%",
+      "content of file %string%"
+    ],
+    "description": {
+      "en": "Reads the entire content or lines of a physical local file using SkUtilities.",
+      "ko": "SkUtilities 구문입니다: 서버 로컬 컴퓨터에 존재하는 특정 텍스트 파일의 내용 전체를 한 줄씩 긁어옵니다."
+    }
+  }
+}
