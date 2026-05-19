@@ -40,61 +40,43 @@
 			{
 				"language": "vskript",
 				"scopeName": "source.sk",
-				"path": "themes/vskript.tmLanguage.json"
+				"path": "./themes/vskript.tmLanguage.json"
 			}
 		],
 		"themes": [
 			{
-				"label": "VSkript (Light+)",
-				"id": "vskript",
-				"uiTheme": "vs",
-				"path": "./themes/vskript_light.json"
-			},
-			{
-				"label": "VSkript (Dark+)",
-				"id": "vskript",
+				"label": "VSkript - Dark+",
 				"uiTheme": "vs-dark",
 				"path": "./themes/vskript_dark.json"
-			}
-		],
-		"semanticTokenTypes": [
+			},
 			{
-				"id": "templateType",
-				"superType": "type",
-				"description": "A templete type"
-			}
-		],
-		"semanticTokenModifiers": [
-			{
-				"id": "native",
-				"description": "test token modifiers"
+				"label": "VSkript - light+",
+				"uiTheme": "vs",
+				"path": "./themes/vskript_light.json"
 			}
 		],
 		"configuration": {
-			"title": "vSkript",
+			"title": "VSkript Configuration",
 			"properties": {
-				"vskript.analyze.indentation": {
-					"type": "boolean",
-					"default": true,
-					"description": "들여쓰기 오류(혼용 및 깊이)를 검사할지 여부를 설정합니다."
-				},
-				"vskript.analyze.preferSpaces": {
-					"type": "boolean",
-					"default": false,
-					"description": "체크 시 공백(Space)을, 체크 해제 시 탭(Tab)을 권장 들여쓰기로 사용합니다."
-				},
 				"vskript.language": {
 					"type": "string",
 					"default": "en",
-					"enum": [
-						"en",
-						"ko"
-					],
+					"enum": ["en", "ko"],
 					"enumDescriptions": [
 						"English descriptions will be shown by default.",
 						"한국어 설명서 및 가이드를 최우선으로 출력합니다."
 					],
 					"description": "vskript 인텔리센스(자동완성, 호버)에 표시될 가이드의 기본 언어를 설정합니다."
+				},
+				"vskript.hoverContentMode": {
+				"type": "string",
+				"default": "description",
+				"enum": ["description", "code"],
+				"enumDescriptions": [
+					"함수 상단 주석으로 작성된 가이드설명서(#>)를 우선 출력합니다.",
+					"함수의 실제 내부 소스 코드 본문(구현부)을 통째로 팝업에 출력합니다."
+				],
+				"description": "마우스를 올렸을 때(Hover) 표시할 함수의 콘텐츠 제공 형식을 선택합니다."
 				}
 			}
 		},
@@ -104,6 +86,7 @@
 			}
 		}
 	},
+
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./ && npm run copy-resources",
