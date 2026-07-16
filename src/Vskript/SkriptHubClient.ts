@@ -178,7 +178,16 @@ export class SkriptHubClient {
 	/** 로컬에 저장된 DB 로드 및 Seed Data 초기화 */
 	private loadLocalDb(extensionPath: string) {
 		// [강제 리셋 장치] 루트 경로에서 우리가 정성껏 만든 1056개 core_syntax.json을 조준합니다.
-		const defaultDataPath = path.join(extensionPath, 'src', 'resource', 'core_syntax.json');
+		// .vscodeignore가 src/**를 항상 제외하므로 배포된 vsix에는 src/resource 경로가 없다.
+		// SkriptCompletionItemProvider.ts와 동일한 3중 폴백을 적용한다:
+		// out/resource -> __dirname 기준 out/resource -> src/resource(개발 모드 전용)
+		let defaultDataPath = path.join(extensionPath, 'out', 'resource', 'core_syntax.json');
+		if (!fs.existsSync(defaultDataPath)) {
+			defaultDataPath = path.join(__dirname, '..', 'resource', 'core_syntax.json');
+		}
+		if (!fs.existsSync(defaultDataPath)) {
+			defaultDataPath = path.join(extensionPath, 'src', 'resource', 'core_syntax.json');
+		}
 
 		try {
 			if (fs.existsSync(defaultDataPath)) {
