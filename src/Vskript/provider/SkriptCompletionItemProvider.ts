@@ -6,6 +6,13 @@ import * as path from 'path';
  * [Step 10 고도화] 마인크래프트 버전 선언 기반 온디맨드 변환 및 애드온 통합 자동완성 엔진
  */
 export class SkriptCompletionItemProvider implements vscode.CompletionItemProvider {
+
+    // 🌟 [성능 최적화] provideCompletionItems()가 트리거될 때마다 core_syntax.json / ko_dict.json /
+    // 애드온 json을 매번 fs.readFileSync + JSON.parse로 재로딩하던 문제를 막기 위한 프로세스 캐시.
+    // 최초 1회 로드 후 재사용한다.
+    private static coreDbCache: Record<string, any> | null = null;
+    private static koDictCache: Record<string, string> | null = null;
+    private static readonly addonDbCache = new Map<string, Record<string, any> | null>();
     
     public async provideCompletionItems(
         document: vscode.TextDocument,
@@ -62,17 +69,22 @@ export class SkriptCompletionItemProvider implements vscode.CompletionItemProvid
             // 실시간 결합될 동적 데이터베이스 메모리 풀(Pool)
             const activeSyntaxDatabases: { db: Record<string, any>; forceAddonName?: string }[] = [];
 
-            // 1️⃣ [코어 엔진 상시 장착] core_syntax.json 로드
-            let corePath = path.join(rootPath, 'out', 'resource', 'core_syntax.json');
-            if (!fs.existsSync(corePath)) corePath = path.join(__dirname, '..', '..', 'resource', 'core_syntax.json');
-            if (!fs.existsSync(corePath)) corePath = corePath.replace('out', 'src');
+            // 1️⃣ [코어 엔진 상시 장착] core_syntax.json 로드 (최초 1회만 디스크에서 읽고 이후는 캐시 재사용)
+            if (SkriptCompletionItemProvider.coreDbCache) {
+                activeSyntaxDatabases.push({ db: SkriptCompletionItemProvider.coreDbCache });
+            } else {
+                let corePath = path.join(rootPath, 'out', 'resource', 'core_syntax.json');
+                if (!fs.existsSync(corePath)) corePath = path.join(__dirname, '..', '..', 'resource', 'core_syntax.json');
+                if (!fs.existsSync(corePath)) corePath = corePath.replace('out', 'src');
 
-            if (fs.existsSync(corePath)) {
-                try {
-                    const coreDb = JSON.parse(fs.readFileSync(corePath, 'utf-8'));
-                    activeSyntaxDatabases.push({ db: coreDb });
-                } catch (e) {
-                    console.error("🚨 [vskript] 코어 데이터셋 로드 실패:", e);
+                if (fs.existsSync(corePath)) {
+                    try {
+                        const coreDb = JSON.parse(fs.readFileSync(corePath, 'utf-8'));
+                        SkriptCompletionItemProvider.coreDbCache = coreDb;
+                        activeSyntaxDatabases.push({ db: coreDb });
+                    } catch (e) {
+                        console.error("🚨 [vskript] 코어 데이터셋 로드 실패:", e);
+                    }
                 }
             }
 
@@ -86,15 +98,20 @@ export class SkriptCompletionItemProvider implements vscode.CompletionItemProvid
                 }
             });
 
-            // 한국어 사전 로드 경로 보정
-            let koDictPath = path.join(rootPath, 'out', 'resource', 'ko_dict.json');
-            if (!rootPath || !fs.existsSync(koDictPath)) {
-                koDictPath = path.join(__dirname, '..', '..', 'resource', 'ko_dict.json');
-            }
-
+            // 한국어 사전 로드 경로 보정 (최초 1회만 디스크에서 읽고 이후는 캐시 재사용)
             let koDict: Record<string, string> = {};
-            if (fs.existsSync(koDictPath)) {
-                koDict = JSON.parse(fs.readFileSync(koDictPath, 'utf-8')) as Record<string, string>;
+            if (SkriptCompletionItemProvider.koDictCache) {
+                koDict = SkriptCompletionItemProvider.koDictCache;
+            } else {
+                let koDictPath = path.join(rootPath, 'out', 'resource', 'ko_dict.json');
+                if (!rootPath || !fs.existsSync(koDictPath)) {
+                    koDictPath = path.join(__dirname, '..', '..', 'resource', 'ko_dict.json');
+                }
+
+                if (fs.existsSync(koDictPath)) {
+                    koDict = JSON.parse(fs.readFileSync(koDictPath, 'utf-8')) as Record<string, string>;
+                    SkriptCompletionItemProvider.koDictCache = koDict;
+                }
             }
 
             // 3️⃣ [통합 비동기 스캔 루프] 활성화된 데이터베이스 세트만 정밀 회전
@@ -312,6 +329,11 @@ export class SkriptCompletionItemProvider implements vscode.CompletionItemProvid
      */
 private loadAddonSyntaxOnDemand(addonName: string, rootPath: string): Record<string, any> | null {
         const cleanName = addonName.toLowerCase().trim();
+
+        // 0. [프로세스 메모리 캐시] 같은 세션 안에서 이미 로드한 애드온이면 디스크 재접근 없이 즉시 반환
+        if (SkriptCompletionItemProvider.addonDbCache.has(cleanName)) {
+            return SkriptCompletionItemProvider.addonDbCache.get(cleanName)!;
+        }
         
         // 1. 로컬 저장 공간 및 개별 애드온 파일 경로 정의
         const addonsDir = path.join(rootPath, 'out', 'resource', 'addons');
@@ -329,7 +351,9 @@ private loadAddonSyntaxOnDemand(addonName: string, rootPath: string): Record<str
         // 3. [로컬 캐시 체크] 파일이 물리적으로 이미 존재한다면 0ms 즉시 반환 (부하 방지)
         if (fs.existsSync(addonPath)) {
             try {
-                return JSON.parse(fs.readFileSync(addonPath, 'utf-8'));
+                const localAddonDb = JSON.parse(fs.readFileSync(addonPath, 'utf-8'));
+                SkriptCompletionItemProvider.addonDbCache.set(cleanName, localAddonDb);
+                return localAddonDb;
             } catch (e) {
                 console.error(`🚨 [vskript] 로컬 캐시 [${cleanName}.json] 파싱 실패:`, e);
             }
@@ -379,12 +403,14 @@ private loadAddonSyntaxOnDemand(addonName: string, rootPath: string): Record<str
                 // 원격지에서 받아온 순수 JSON 데이터를 유저 컴퓨터의 로컬 디스크에 반영구 보존 (오프라인 모드 보장)
                 fs.writeFileSync(addonPath, JSON.stringify(targetedData, null, 2), 'utf-8');
                 console.log(`🟢 [vskript] 원격 서버에서 [${cleanName}.json] 다운로드 완료 및 로컬 영구 캐싱 성공!`);
+                SkriptCompletionItemProvider.addonDbCache.set(cleanName, targetedData);
                 return targetedData;
             } else {
                 // 데이터베이스 생태계에 아직 수집되지 않은 새로운 애드온일 경우, 빈 뼈대 파일을 사출하여 개발자가 직접 채워넣을 수 있도록 친절히 배려
                 const emptyTemplate: Record<string, any> = {};
                 fs.writeFileSync(addonPath, JSON.stringify(emptyTemplate, null, 2), 'utf-8');
                 console.info(`💾 [vskript] 새 애드온 [${cleanName}] 감지: 수집 스케줄러를 위해 빈 템플릿 json을 생성했습니다.`);
+                SkriptCompletionItemProvider.addonDbCache.set(cleanName, emptyTemplate);
                 return emptyTemplate;
             }
 
