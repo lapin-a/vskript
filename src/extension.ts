@@ -143,8 +143,8 @@ export async function activate(context: ExtensionContext) {
     );
 
     const watcher = workspace.createFileSystemWatcher('**/*.sk');
-    watcher.onDidCreate(() => Skript.onSkriptEnable());
-    watcher.onDidDelete(() => Skript.onSkriptEnable());
+    watcher.onDidCreate((uri) => Skript.scanSingleFile(uri));
+    watcher.onDidDelete((uri) => Skript.removeDocument(uri.fsPath));
     context.subscriptions.push(watcher);
 
     context.subscriptions.push(
