@@ -51,6 +51,14 @@ export function scanSingleFile(uri: vscode.Uri): SkriptDocument {
 	return skDocument;
 }
 
+/** 삭제된 파일을 DOCUMENTS에서 제거 (extension.ts 파일워처 onDidDelete용) */
+export function removeDocument(fsPath: string): void {
+	const index = DOCUMENTS.findIndex(document => document.skPath.fsPath === fsPath);
+	if (index !== -1) {
+		DOCUMENTS.splice(index, 1);
+	}
+}
+
 /** 경로와 같은 SkriptFile이 있으면 반환 */
 export function find(fsPath:string): SkriptDocument | undefined {
 	for (const document of DOCUMENTS) if (document.skPath.fsPath === fsPath) {
