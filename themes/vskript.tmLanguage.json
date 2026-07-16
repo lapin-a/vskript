@@ -101,10 +101,20 @@
 			"patterns": [ { "patterns": [ { "include": "#sentence" } ] } ]
 		},
 		{
-            "_comment": "Skript Event Section",
-			"begin": "^(?:(?:on|every) +)?\\b(portal\\s+create|portal\\s+enter|tool\\s+change|armor\\s+change|bed\\s+enter|bed\\s+leave|block\\s+damage|bucket\\s+empty|bucket\\s+fill|portal|zap|vulnerability|break|burn|chat|click|command|connect|consume|damage|death|drop|eat|explosion|fade|fish|form|grow|heal|join|jump|kick|kill|move|place|quit|respawn|shear|shoot|sneak|spawn|sprint|tame|target|teleport|throw|transform)(?=\\:| )",           
+            "_comment": "Skript Event Section (on/every 뒤 임의의 이벤트명을 포괄적으로 하이라이트. 하드코딩 목록은 알려진 이벤트에 대한 추가 강조용 보조 규칙으로만 남긴다)",
+			"begin": "^(on|every) +([^:\\t\\n]+)(?=\\:)",
 			"end": "(?=^(?!(\\#|\\t| |$)))",
-            "beginCaptures": { "0": { "name": "vskript.event" } },
+            "beginCaptures": {
+                "0": { "name": "vskript.event" },
+                "2": {
+                    "patterns": [
+                        {
+                            "match": "\\b(portal\\s+create|portal\\s+enter|tool\\s+change|armor\\s+change|bed\\s+enter|bed\\s+leave|block\\s+damage|bucket\\s+empty|bucket\\s+fill|portal|zap|vulnerability|break|burn|chat|click|command|connect|consume|damage|death|drop|eat|explosion|fade|fish|form|grow|heal|join|jump|kick|kill|move|place|quit|respawn|shear|shoot|sneak|spawn|sprint|tame|target|teleport|throw|transform)\\b",
+                            "name": "vskript.event.known"
+                        }
+                    ]
+                }
+            },
             "patterns": [ { "patterns": [ { "include": "#sentence" } ] } ]
         },
 		{ "include": "#reflect" }
