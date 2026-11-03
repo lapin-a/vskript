@@ -12,12 +12,7 @@
 
 ## 🔴 높음
 
-### H3. 자동완성/호버 실제 사용 환경 검증
-
-- **현재 상태**: 통합 테스트(VS Code 1.120, `npm test`)로 활성화·명령 등록·구문 자동완성(버전별 제안 수 차이)·`{@` 옵션 완성·구문 호버는 자동 확인됨. 단 테스트는 저장되지 않은 문서 기준이며, **실제 서버 폴더 + 내려받은 DataPack + 한국어 번역 호버**는 미확인.
-- **해야 할 일**:
-  - [ ] vskript-database의 번역된 DataPack push 후, 실제 서버 폴더에서 `vskript.language: ko` 호버 확인
-  - [ ] `a7c4ff1` 작성자에게 의도했던 변경("use DocumentSymbol") 확인 후 필요하면 재적용
+(없음)
 
 ---
 
@@ -54,6 +49,8 @@
 
 ## 완료된 항목
 
+- [x] **H3. 자동완성/호버 실제 사용 환경 검증** (2026-11-03): 통합 테스트 `src/test/suite/environment.test.ts`로 자동화 — 임시 서버 폴더(`plugins/Skript.jar`, Skript 2.10.0) 감지 → GitHub에서 DataPack 다운로드 → 감지 버전으로 자동완성 필터 → `vskript.language: ko` 한국어 호버 (오프라인이면 건너뜀). 이 과정에서 버그 발견·수정: 감지가 진행 중일 때(예: 시작 직후 첫 DataPack 다운로드) "다시 감지" 명령이 **옛 설정으로 시작된 결과**를 돌려주던 문제 → 진행 중인 감지가 끝나면 바로 한 번 더 감지하고 그 결과로 완료
+  - `a7c4ff1`("use DocumentSymbol") 분석: 아웃라인(`SkriptDocumentSymbolProvider.ts`)에 넣으려던 변경 2개가 자동완성 파일에 잘못 덮어써진 것으로 판단 → 아웃라인에 적용. ① 함수 매개변수 타입이 `[object Object]`로 표시되던 버그 수정(`p.type.text`) ② 수정 중인 문서도 아웃라인 캐시 재사용(모델은 350ms 디바운스 때 갱신되므로 결과 동일, 계산만 줄어듦). 아웃라인 테스트 추가
 - [x] **H2. 전역 `console.log` 가로채기 제거** (2026-11-03): `activate()`의 전역 `console.log`/`console.info` 덮어쓰기와 미사용 `patchLogger.ts` 삭제. 새 `src/Vskript/Logger.ts`가 출력 패널의 "VSkript" 로그 채널(`LogOutputChannel`) 하나에 기록하며 `ServerEnvironment`도 같은 채널을 씀(같은 이름의 채널이 두 개 생기던 문제 해소). 타이핑·스캔마다 찍히던 기록은 debug 수준으로 내림(출력 패널에서 수준 변경 가능). 재발 방지: eslint `no-restricted-syntax`로 `console.* =` 대입을 **오류** 처리 → `npm test`(린트 포함)에서 실패. 런타임 테스트는 테스트 실행기가 console을 계속 다시 감싸서 함수 비교가 불가능해 쓰지 않음
 - [x] **L3. 개발 도구 의존성 업그레이드** (2026-11-03): typescript 4 → 6.0(typescript-eslint가 `<6.1`까지 지원해 7.x는 보류), eslint 7 → 10 + typescript-eslint 8(`.eslintrc.json` → `eslint.config.mjs`), `vscode-test` → `@vscode/test-cli` + `@vscode/test-electron`, mocha 8 → 11, `@types/node` 12 → 22, `copyfiles` → `fs.cpSync`, 미사용 `glob`/`@types/glob` 제거. 런타임 의존성 취약점 0건. 남은 `npm audit` 17건은 전부 테스트 도구(mocha, @vscode/test-cli) 하위 의존성이며 상위 수정판 없음
 - [x] **L2. 테스트 / 린트** (2026-11-03): `npm test` = 컴파일 → 린트 → VS Code 1.120 통합 테스트(단위 5 + 통합 4). VS Code 없이 빠르게 돌리는 `npm run test:unit`. 린트 경고 190 → 0 (`--fix`, `naming-convention`은 외부 JSON 필드명 snake_case·enum UPPER_CASE 허용, `eqeqeq`는 `== null` 허용, 나머지 지역 변수명 정리)

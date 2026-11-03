@@ -1,4 +1,7 @@
 import * as assert from 'assert';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
 const EXTENSION_ID = 'Vhone.vskript';
@@ -40,6 +43,29 @@ suite('VSkript 확장', () => {
         const doc = await openSkript('options:\n\tprefix: &a[Test]\n\non load:\n\tbroadcast "{@');
         const labels = await completionLabels(doc, new vscode.Position(4, 14));
         assert.deepStrictEqual(labels, ['{@prefix}']);
+    });
+
+    test('아웃라인의 함수에 매개변수 타입이 표시된다', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vskript-outline-'));
+        const file = path.join(dir, 'outline.sk');
+        fs.writeFileSync(file, 'function greet(name: text, times: number):\n\tbroadcast {_name}\n');
+        try {
+            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+            await vscode.window.showTextDocument(doc);
+            let names: string[] = [];
+            for (let i = 0; i < 20 && !names.some(n => n.startsWith('greet(')); i++) {
+                const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>('vscode.executeDocumentSymbolProvider', doc.uri) || [];
+                names = symbols.map(s => s.name);
+                if (!names.some(n => n.startsWith('greet('))) {await new Promise(r => setTimeout(r, 100));}
+            }
+            const fn = names.find(n => n.startsWith('greet('));
+            assert.ok(fn, `함수 심볼이 없음: ${JSON.stringify(names)}`);
+            assert.doesNotMatch(fn, /object Object/);
+            assert.match(fn, /name: text/);
+        } finally {
+            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
     });
 
     test('구문 호버를 보여 준다', async () => {

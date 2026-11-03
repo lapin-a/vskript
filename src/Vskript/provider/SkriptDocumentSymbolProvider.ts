@@ -10,9 +10,10 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
         const fsPath = document.uri.fsPath;
         const cached = SYMBOLS_MAP.get(fsPath);
 
-        // 🌟 [캐시 제어 최적화] 수정 중(isDirty)이더라도 캐시가 이미 존재한다면 
-        // 무조건 폭파하는 대신 기존 캐시를 재활용하여 타이핑 시 렉을 원천 봉쇄합니다.
-        if (cached && cached.length > 0 && !document.isDirty) {
+        // 수정 중(isDirty)이어도 캐시가 있으면 재사용한다.
+        // 문서 모델(skDocument)은 TextDocumentChangeEvent의 350ms 디바운스 때 갱신되고 그때 SYMBOLS_MAP도 비우므로,
+        // 그 전에 다시 만들어도 어차피 이전 모델 기준이다. (커밋 a7c4ff1에서 의도한 변경)
+        if (cached && cached.length > 0) {
             return cached;
         }
 
@@ -74,7 +75,8 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
         for (const skFunction of skDocument.getComponents(SkriptFunction)) {
             let paramsString = "";
             if (skFunction.parameters && Array.isArray(skFunction.parameters)) {
-                paramsString = skFunction.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
+                // SkriptType에는 toString이 없어 `${p.type}`은 [object Object]가 된다 (커밋 a7c4ff1에서 의도한 변경)
+                paramsString = skFunction.parameters.map(p => `${p.name}: ${p.type.text}`).join(', ');
             }
             const fullTitle = `${skFunction.title}(${paramsString})`;
             const functionSymbol = new DocumentSymbol(fullTitle, 'Function', SymbolKind.Function, skFunction.range, skFunction.range);
