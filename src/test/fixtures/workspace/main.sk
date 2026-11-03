@@ -1,0 +1,2 @@
+on load:
+    set {_x} to greet(player, 1)

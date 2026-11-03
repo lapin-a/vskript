@@ -70,7 +70,7 @@ suite('VSkript 확장', () => {
             const fn = names.find(n => n.startsWith('greet('));
             assert.ok(fn, `함수 심볼이 없음: ${JSON.stringify(names)}`);
             assert.doesNotMatch(fn, /object Object/);
-            assert.match(fn, /name: text/);
+            assert.strictEqual(fn, 'greet(name:text, times:number)');
         } finally {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
             removeTempDir(dir);

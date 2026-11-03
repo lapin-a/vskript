@@ -45,7 +45,8 @@ export abstract class SkriptComponent {
 		if (search = component.match(/^(?<component>(?<head>aliases)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups){
 			return this._createAliases(skDocument, targetRange, search.component, search.head, search.body);
 
-		} else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)(?:[\t\s]+|\#.*|$))*))/i)?.groups) {
+		// 본문 = 들여쓴 줄 전체 (v0.0.9 규칙; 공백만 받으면 옵션 줄 내용이 빠져 옵션 목록이 비게 된다)
+		} else if (search = component.match(/^(?<component>(?<head>options)\:(.*)(?<body>((\r\n|\r|\n)([^a-zA-Z][^\r\n]*)?)+))/i)?.groups) {
 			// options 인식 부분
 			return this._createOptions(skDocument, targetRange, search.component, search.head, search.body);
 
@@ -59,7 +60,8 @@ export abstract class SkriptComponent {
 			return this._createCommand(skDocument, targetRange, search.component, search.head, search.body || "");
 		}
 		// 4. Function
-		else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s*\:\:\s*(?:[^:]+))?)\:(?:[^:]*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
+		// 머리 뒤는 줄 끝까지만(.*) — [^:]*는 줄바꿈을 넘어가 본문을 삼켜서 함수 본문(지역 변수 등)이 사라졌다
+		else if (search = component.match(/^(?<component>(?<head>function\s(?:\w+)\((?:.*)\)(?:\s*\:\:\s*(?:[^:]+))?)\:(.*)((\r\n|\r|\n)(?<body>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/i)?.groups) {
 			return this._createFunction(skDocument, targetRange, search.component, search.head, search.body || "");
 		}
 

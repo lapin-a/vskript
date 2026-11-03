@@ -1,0 +1,34 @@
+options:
+    prefix: &a[Test]
+
+aliases:
+    shiny = diamond, emerald
+
+command /heal [<player>]:
+    permission: test.heal
+    trigger:
+        set {_target} to arg-1
+        heal {_target}
+
+on join:
+    set {_name} to player's name
+    broadcast "%{_name}% joined"
+    send "{@prefix} hello %{_name}%" to player
+    give shiny to player
+
+every 5 minutes:
+    broadcast "tick"
+
+at 12:00:
+    broadcast "noon"
+
+#> Greets a player
+#> @param who target player
+function greet(who: player, times: number) :: text:
+    set {_msg} to "hi"
+    send {_msg} to {_who}
+    return {_msg}
+
+#> @invisible
+function fxHidden():
+    broadcast "hidden"

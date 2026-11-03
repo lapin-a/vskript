@@ -7,11 +7,18 @@ import * as Provider from './Vskript/provider/Provider';
 import onTextDocumentChange from './Vskript/event/TextDocumentChangeEvent';
 import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
 import { clearDiagnostics, diagnosticTimers, scheduleAllDiagnostics, scheduleDiagnostics, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
-import { initSyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
-import { ServerEnvironmentManager, getEnvironment } from './Vskript/env/ServerEnvironment';
+import { getSyntaxRegistry, initSyntaxRegistry, SyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
+import { ServerEnvironmentManager, getEnvironment, EnvironmentState } from './Vskript/env/ServerEnvironment';
 import { initLogger, log } from './Vskript/Logger';
 
-export async function activate(context: ExtensionContext) {
+/** activate()가 돌려주는 API (vscode.extensions.getExtension(...).exports) — 통합 테스트에서 내부 상태 확인용 */
+export interface VSkriptApi {
+    getEnvironment(): EnvironmentState | null;
+    getSyntaxRegistry(): SyntaxRegistry | null;
+    statusBarText(): string;
+}
+
+export async function activate(context: ExtensionContext): Promise<VSkriptApi> {
     initLogger(context);
     log.info('VSkript 활성화 시작');
     // 구문 저장소(번들 core + DataPack). 서버 환경이 바뀌면 스스로 다시 읽는다.
@@ -113,6 +120,12 @@ export async function activate(context: ExtensionContext) {
         languages.registerDocumentSemanticTokensProvider('vskript', new Provider.SkriptDocumentSemanticTokensProvider(), LEGEND),
         languages.registerColorProvider('vskript', new Provider.SkriptDocumentColorProvider())
     );
+
+    return {
+        getEnvironment,
+        getSyntaxRegistry,
+        statusBarText: () => environment.statusBarText,
+    };
 }
 
 export function deactivate() {}

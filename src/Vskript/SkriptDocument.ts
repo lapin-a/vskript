@@ -175,10 +175,10 @@ export class SkriptDocument {
 		this._components.length = 0;
 		let document = this._document;
 
-		// [완전 보강 버전]
-		// 1. 줄 시작 부분에 options, aliases, on, function, command 등이 오는지 확인
-		// 2. 다음 "들여쓰기 없는 새로운 구문"이 나오기 전까지의 모든 줄(주석, 빈줄 포함)을 한 덩어리로 묶음
-		const paragraphRegex = /(?<=^|\r\n|\r|\n)(?<comment>(\t|\s)*\#.*((\r\n|\r|\n)(\t|\s)+\#.*)*(\r\n|\r|\n)?)?(?<paragraph>[a-zA-Z0-9].*(\r\n|\r|\n|(?:\r\n|\r|\n)(?:[\t\s]+|\#.*|$))+)/g;
+		// 덩어리 = (바로 위의 연속된 주석 줄들) + 머리 줄(글자/숫자로 시작) + 이어지는 줄들(빈 줄 또는 들여쓰기·#으로 시작).
+		// 50ef177에서 이어지는 줄 규칙이 `[\t\s]+`(공백만)로 바뀌어 들여쓴 줄의 내용이 빠지고, 모든 컴포넌트가
+		// 머리 줄 하나만 갖게 되었다(아웃라인 하위 항목·의미 강조·툴팁이 전부 사라짐). 원래 규칙(v0.0.9)으로 되돌린다.
+		const paragraphRegex = /(?<=^|\r\n|\r|\n)(?<comment>(?:[\t ]*#.*(?:\r\n|\r|\n))*)(?<paragraph>[a-zA-Z0-9].*(?:(?:\r\n|\r|\n)(?:[^a-zA-Z0-9\r\n].*)?)*)/g;
 
 		let match;
 		while ((match = paragraphRegex.exec(document)) !== null) {
@@ -208,8 +208,12 @@ export class SkriptDocument {
 					}
 				}
 			}
-			// 검색 인덱스 꼬임 방지
-			if (paragraphRegex.lastIndex <= match.index) {
+			// 다음 검색은 "끝의 주석·빈 줄을 잘라낸" 덩어리 끝에서 시작한다.
+			// 그래야 다음 함수 바로 위의 #> 주석(@invisible 등)이 앞 덩어리에 먹히지 않고 다음 덩어리의 툴팁이 된다.
+			if (groups && groups.paragraph) {
+				const trimmedEnd = match.index + match[0].indexOf(groups.paragraph) + this._trimParagraph(groups.paragraph).length;
+				paragraphRegex.lastIndex = Math.max(trimmedEnd, match.index + 1);
+			} else if (paragraphRegex.lastIndex <= match.index) {
 				paragraphRegex.lastIndex = match.index + 1;
 			}
 		}

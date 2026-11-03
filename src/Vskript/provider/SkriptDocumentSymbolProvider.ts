@@ -73,13 +73,9 @@ export class SkriptDocumentSymbolProvider implements DocumentSymbolProvider {
 
         // --- 5. Function ---
         for (const skFunction of skDocument.getComponents(SkriptFunction)) {
-            let paramsString = "";
-            if (skFunction.parameters && Array.isArray(skFunction.parameters)) {
-                // SkriptType에는 toString이 없어 `${p.type}`은 [object Object]가 된다 (커밋 a7c4ff1에서 의도한 변경)
-                paramsString = skFunction.parameters.map(p => `${p.name}: ${p.type.text}`).join(', ');
-            }
-            const fullTitle = `${skFunction.title}(${paramsString})`;
-            const functionSymbol = new DocumentSymbol(fullTitle, 'Function', SymbolKind.Function, skFunction.range, skFunction.range);
+            // title에 이미 "이름(매개변수) :: 반환형:"이 들어 있다 (SkriptFunction 생성자, 타입은 SkriptType.text).
+            // 예전에는 여기서 매개변수를 한 번 더 붙여 "greet(a:text):(a: text)"처럼 두 번 표시됐다.
+            const functionSymbol = new DocumentSymbol(skFunction.title.replace(/:$/, ''), 'Function', SymbolKind.Function, skFunction.range, skFunction.range);
 
             if (skFunction.paragraph) {
                 functionSymbol.children.push(...this._createVariableSymbols(skFunction.paragraph.variables));

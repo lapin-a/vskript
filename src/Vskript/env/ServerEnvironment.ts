@@ -266,6 +266,11 @@ export class ServerEnvironmentManager implements vscode.Disposable {
         if (missing.length) {this.log(`데이터베이스에 없는 애드온 (설정값): ${missing.join(', ')}`);}
     }
 
+    /** 상태 표시줄 문구 (테스트·진단용) */
+    get statusBarText(): string {
+        return this.statusBar.text;
+    }
+
     private updateStatusBar() {
         if (!state) {return;}
         const { result, packs, sync } = state;

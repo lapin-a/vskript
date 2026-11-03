@@ -27,6 +27,8 @@ export class SkriptDocumentSemanticTokensProvider implements DocumentSemanticTok
 		for (const skComp of skDocument.components) {if (skComp instanceof SkriptParagraphComponent) {
 
 			let paragraph = skComp.paragraph;
+			// 본문이 비어 있는 컴포넌트(내용 없는 "on load:" 등)는 paragraph가 없다
+			if (!paragraph) {continue;}
 
 			// Aliases
 			let rangeVariable: Range[] = [];

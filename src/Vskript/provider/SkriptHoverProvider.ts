@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Skript from "../Skript";
+import { SkriptFunction } from '../SkriptComponent';
 import { buildSyntaxMarkdown, getSyntaxRegistry } from '../syntax/SyntaxRegistry';
 import { log } from '../Logger';
 
@@ -88,6 +89,13 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
         // 🌟 사용자 설정 읽어오기 (기본값: 'description')
         const config = vscode.workspace.getConfiguration('vskript');
         const hoverMode = config.get<string>('hoverContentMode', 'description');
+
+        // description 모드: 함수 위의 Docs 주석(#>)은 문서 모델이 함수의 툴팁으로 갖고 있다 (열지 않은 파일 포함).
+        // @param / @return 서식은 SkriptToolTip.markdown이 만든다.
+        if (hoverMode !== 'code') {
+            const skFunction = this._findFunction(word);
+            if (skFunction?.tooltip) {return new vscode.Hover(skFunction.tooltip.markdown, wordRange);}
+        }
 
         // 1단계: 메모리 활성 문서 스캔
         for (const openDoc of vscode.workspace.textDocuments) {
@@ -218,8 +226,22 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
             bodyLines.push(line);
             nextIdx++;
         }
-        
+
+        // 끝에 붙은 빈 줄·주석은 다음 구문의 것(#> @invisible 등)이므로 뺀다
+        while (bodyLines.length > 1 && /^\s*(#.*)?$/.test(bodyLines[bodyLines.length - 1])) {
+            bodyLines.pop();
+        }
         return bodyLines.join('\n');
+    }
+
+    /** 스캔된 문서들에서 이름으로 함수를 찾는다 */
+    private _findFunction(name: string): SkriptFunction | undefined {
+        for (const skDoc of Skript.DOCUMENTS) {
+            for (const skFunction of skDoc.getComponents(SkriptFunction)) {
+                if (skFunction.name.toLowerCase() === name.toLowerCase()) {return skFunction;}
+            }
+        }
+        return undefined;
     }
 
     private escapeRegExp(string: string) {

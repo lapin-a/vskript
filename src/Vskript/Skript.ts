@@ -39,7 +39,9 @@ export function scanSingleFile(uri: vscode.Uri): SkriptDocument {
 	if (existing) {return existing;}
 
 	// 워크스페이스 루트 경로 추적 (없을 시 파일의 부모 폴더를 임시 루트로 지정)
-	let root = workspace.workspaceFolders?.[0]?.uri.fsPath || Path.dirname(fsPath);
+	// 파일이 속한 작업 공간 폴더를 루트로 쓴다. 첫 번째 폴더를 무조건 쓰면 다른 드라이브(C: ↔ D:)의 파일은
+	// Path.relative가 절대 경로를 돌려줘 "D:\ws\C:\..."처럼 잘못된 경로가 되고, 문서를 찾지 못한다.
+	let root = workspace.getWorkspaceFolder(uri)?.uri.fsPath || Path.dirname(fsPath);
 	let name = Path.relative(root, fsPath);
 	
 	let skPath = new SkriptPath(root, name);
