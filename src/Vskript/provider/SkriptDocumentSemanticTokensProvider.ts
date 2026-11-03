@@ -1,5 +1,5 @@
 import { CancellationToken, DocumentSemanticTokensProvider, Position, ProviderResult, Range, SemanticTokens, SemanticTokensBuilder, SemanticTokensLegend, TextDocument } from "vscode";
-import * as Skript from '../Skript'
+import * as Skript from '../Skript';
 import { SkriptVariable } from "../language/SkriptExpressions";
 import { SkriptAliases, SkriptEvent, SkriptFunction, SkriptParagraphComponent } from "../SkriptComponent";
 
@@ -19,49 +19,49 @@ export class SkriptDocumentSemanticTokensProvider implements DocumentSemanticTok
 		let aliases = new Map<Position, Set<string>>();
 		skDocument.getComponents(SkriptAliases).forEach((skAliases) => {
 			let set = new Set<string>();
-			skAliases.aliases.forEach((alias) => { set.add(alias.key) });
+			skAliases.aliases.forEach((alias) => { set.add(alias.key); });
 			aliases.set(skAliases.range.end, set);
 		});
 
 		// Components
-		for (const skComp of skDocument.components) if (skComp instanceof SkriptParagraphComponent) {
+		for (const skComp of skDocument.components) {if (skComp instanceof SkriptParagraphComponent) {
 
 			let paragraph = skComp.paragraph;
 
 			// Aliases
 			let rangeVariable: Range[] = [];
-			paragraph.variables.forEach(variable => rangeVariable.push(variable.range))
+			paragraph.variables.forEach(variable => rangeVariable.push(variable.range));
 
-			for (const alias_pos of aliases.keys()) if (alias_pos.isBefore(skComp.range.start)) {
+			for (const aliasPos of aliases.keys()) {if (aliasPos.isBefore(skComp.range.start)) {
 				let legacy = paragraph.legacy;
 				let offset =skDocument.offsetAt(paragraph.range.start);
-				let set = aliases.get(alias_pos)!;
+				let set = aliases.get(aliasPos)!;
 				for (const alias of set) {
 					let position = 0;
 					let index;
 					while ((index = legacy.indexOf(alias, position)) >= 0) {
 						position = index + alias.length;
-						let range = new Range(skDocument.positionAt(offset + index)!, skDocument.positionAt(offset + position)!)
+						let range = new Range(skDocument.positionAt(offset + index)!, skDocument.positionAt(offset + position)!);
 						if (rangeVariable.filter(r => r.intersection(range)).length === 0)
-							builder.push(range, 'aliases');
+							{builder.push(range, 'aliases');}
 					}
 				}
-			}
+			}}
 
 			// Function Parameter
 			if (skComp instanceof SkriptFunction) {
 				let parameters = skComp.parameters;
-				if (parameters) for (const parameter of parameters) for (const variable of paragraph.variables) {
+				if (parameters) {for (const parameter of parameters) {for (const variable of paragraph.variables) {
 					let name = (parameter.type.isList) ? `{_${parameter.name}::*}` : `{_${parameter.name}}`;
 					for (const v of this._getAllChildVariables(variable)) {
 						if ( name === v.raw ) {
 							builder.push(v.range, 'parameter');
 						}
 					}
-				}
+				}}}
 			}
 
-		};
+		}};
 
 		// // Function
 		// skDocument.getComponents(SkriptFunction).forEach(skFunc => {
@@ -80,10 +80,10 @@ export class SkriptDocumentSemanticTokensProvider implements DocumentSemanticTok
 		//     }
 
 		//     // Aliases
-		//     for (const alias_pos of aliases.keys()) if (alias_pos.isBefore(skFunc.range.start)) {
+		//     for (const aliasPos of aliases.keys()) if (aliasPos.isBefore(skFunc.range.start)) {
 		//         let legacy = paragraph.legacy;
 		//         let start =paragraph.range.start;
-		//         let set = aliases.get(alias_pos)!;
+		//         let set = aliases.get(aliasPos)!;
 		//         for (const alias of set) {
 		//             let position = 0;
 		//             let index;
@@ -102,10 +102,10 @@ export class SkriptDocumentSemanticTokensProvider implements DocumentSemanticTok
 		//     let paragraph = skEvent.paragraph;
 
 		//     // Aliases
-		//     for (const alias_pos of aliases.keys()) if (alias_pos.isBefore(skEvent.range.start)) {
+		//     for (const aliasPos of aliases.keys()) if (aliasPos.isBefore(skEvent.range.start)) {
 		//         let legacy = paragraph.legacy;
 		//         let start =paragraph.range.start;
-		//         let set = aliases.get(alias_pos)!;
+		//         let set = aliases.get(aliasPos)!;
 		//         for (const alias of set) {
 		//             let position = 0;
 		//             let index;
@@ -129,11 +129,11 @@ export class SkriptDocumentSemanticTokensProvider implements DocumentSemanticTok
 		for (const child of variable.child) {
 			array.push(...this._getAllChildVariables(child));
 		}
-		_asdf('a')
+		_asdf('a');
 		return array;
 	}
 }
 
 function _asdf(text:string): string {
-	return 'a' + text
+	return 'a' + text;
 }

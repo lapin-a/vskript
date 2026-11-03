@@ -19,7 +19,7 @@ function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[]
     for (let i = 0; i < lineCount; i++) {
         const line = document.lineAt(i);
         const text = line.text;
-        if (text.trim() === '' || text.trim().startsWith('#')) continue;
+        if (text.trim() === '' || text.trim().startsWith('#')) {continue;}
 
         const indentMatch = text.match(/^[\s\t]*/);
         const indentStr = indentMatch ? indentMatch[0] : '';
@@ -62,7 +62,7 @@ function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[]
  * 핵심 실시간 진단 실행 엔진
  */
 export function refreshDiagnostics(document: vscode.TextDocument) {
-    if (!document) return;
+    if (!document) {return;}
 
     try {
         const entries: vscode.Diagnostic[] = [];
@@ -81,7 +81,7 @@ export function refreshDiagnostics(document: vscode.TextDocument) {
             const text = line.text;
 
             const cleanText = text.replace(/#.*/, '').trim();
-            if (cleanText === '') continue;
+            if (cleanText === '') {continue;}
 
             const lowerText = cleanText.toLowerCase();
 

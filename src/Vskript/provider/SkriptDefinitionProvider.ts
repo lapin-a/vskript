@@ -42,8 +42,8 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
 
             // 2단계: VS Code 메모리에 켜져 있는 다른 .sk 파일들 고속 스캔
             for (const openDoc of vscode.workspace.textDocuments) {
-                if (openDoc.uri.toString() === document.uri.toString()) continue;
-                if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+                if (openDoc.uri.toString() === document.uri.toString()) {continue;}
+                if (!openDoc.uri.fsPath.endsWith('.sk')) {continue;}
 
                 for (let i = 0; i < openDoc.lineCount; i++) {
                     if (optionDefRegex.test(openDoc.lineAt(i).text)) {
@@ -55,8 +55,8 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
             // 3단계: 아직 열리지 않은 디스크 상의 다른 인덱싱 스크립트 파일 추적 (최후의 보루)
             for (const skDoc of Skript.DOCUMENTS) {
                 const fsPath = skDoc.skPath.fsPath;
-                if (vscode.workspace.textDocuments.some(d => d.uri.fsPath === fsPath)) continue;
-                if (!fs.existsSync(fsPath)) continue;
+                if (vscode.workspace.textDocuments.some(d => d.uri.fsPath === fsPath)) {continue;}
+                if (!fs.existsSync(fsPath)) {continue;}
 
                 const content = fs.readFileSync(fsPath, 'utf-8');
                 const lines = content.split(/\r?\n/);
@@ -75,13 +75,13 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
         // 🎯 [분기 B] 커스텀 함수 정의 이동 엔진 기동 (기존 구조)
         // ==========================================
         const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z0-9_]+/);
-        if (!wordRange) return undefined;
+        if (!wordRange) {return undefined;}
         
         const targetFuncName = document.getText(wordRange).trim();
 
         // [1차 방어선] AST 구조적 인덱스 캐시 검색
         for (const skDoc of Skript.DOCUMENTS) {
-            if (!skDoc.components) continue;
+            if (!skDoc.components) {continue;}
             
             for (const comp of skDoc.components) {
                 const c = comp as any;
@@ -91,10 +91,10 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
                     (c.statement && c.statement.includes('function')) ||
                     (c.name && c.name.startsWith('function'));
                 
-                if (!isFunction) continue;
+                if (!isFunction) {continue;}
 
                 const compName: string = c.name || c.statement || '';
-                if (!compName) continue;
+                if (!compName) {continue;}
 
                 const pureName = compName.replace(/^function\s+/, '').split('(')[0].trim();
                 
@@ -114,7 +114,7 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
         const funcRegex = new RegExp(`^function\\s+${targetFuncName}\\s*\\(`, 'i');
 
         for (const openDoc of vscode.workspace.textDocuments) {
-            if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+            if (!openDoc.uri.fsPath.endsWith('.sk')) {continue;}
 
             for (let i = 0; i < openDoc.lineCount; i++) {
                 if (funcRegex.test(openDoc.lineAt(i).text.trim())) {
@@ -125,8 +125,8 @@ export class SkriptDefinitionProvider implements vscode.DefinitionProvider {
 
         for (const skDoc of Skript.DOCUMENTS) {
             const fsPath = skDoc.skPath.fsPath;
-            if (vscode.workspace.textDocuments.some(d => d.uri.fsPath === fsPath)) continue;
-            if (!fs.existsSync(fsPath)) continue;
+            if (vscode.workspace.textDocuments.some(d => d.uri.fsPath === fsPath)) {continue;}
+            if (!fs.existsSync(fsPath)) {continue;}
 
             const content = fs.readFileSync(fsPath, 'utf-8');
             const lines = content.split(/\r?\n/);

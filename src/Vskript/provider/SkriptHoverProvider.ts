@@ -42,26 +42,26 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
 
             if (!foundValue) {
                 for (const openDoc of vscode.workspace.textDocuments) {
-                    if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+                    if (!openDoc.uri.fsPath.endsWith('.sk')) {continue;}
                     for (let i = 0; i < openDoc.lineCount; i++) {
                         const m = openDoc.lineAt(i).text.match(optionDefRegex);
                         if (m) { foundValue = m[1].trim(); break; }
                     }
-                    if (foundValue) break;
+                    if (foundValue) {break;}
                 }
             }
 
             if (!foundValue) {
                 for (const skDoc of Skript.DOCUMENTS) {
                     const fsPath = skDoc.skPath.fsPath;
-                    if (!fs.existsSync(fsPath)) continue;
+                    if (!fs.existsSync(fsPath)) {continue;}
                     const content = fs.readFileSync(fsPath, 'utf-8');
                     const lines = content.split(/\r?\n/);
                     for (const line of lines) {
                         const m = line.match(optionDefRegex);
                         if (m) { foundValue = m[1].trim(); break; }
                     }
-                    if (foundValue) break;
+                    if (foundValue) {break;}
                 }
             }
 
@@ -79,7 +79,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
         // 🎯 [분기 B] 일반 단어 (커스텀 함수) 호버 가이드 로직
         // ==========================================
         const wordRange = document.getWordRangeAtPosition(position, /[a-zA-Z0-9_]+/);
-        if (!wordRange) return null;
+        if (!wordRange) {return null;}
 
         const word = document.getText(wordRange).trim();
         const functionRegex = new RegExp(`^\\s*function\\s+${this.escapeRegExp(word)}\\b`, 'i');
@@ -90,7 +90,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
 
         // 1단계: 메모리 활성 문서 스캔
         for (const openDoc of vscode.workspace.textDocuments) {
-            if (!openDoc.uri.fsPath.endsWith('.sk')) continue;
+            if (!openDoc.uri.fsPath.endsWith('.sk')) {continue;}
             for (let i = 0; i < openDoc.lineCount; i++) {
                 if (functionRegex.test(openDoc.lineAt(i).text)) {
                     return this._buildFunctionHover(openDoc.lineAt(i).text, i, openDoc, wordRange, hoverMode);
@@ -102,7 +102,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
         try {
             for (const skDoc of Skript.DOCUMENTS) {
                 const fsPath = skDoc.skPath.fsPath;
-                if (!fs.existsSync(fsPath)) continue;
+                if (!fs.existsSync(fsPath)) {continue;}
 
                 const content = fs.readFileSync(fsPath, { encoding: 'utf-8' });
                 const lines = content.split(/\r?\n/);
@@ -137,7 +137,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
      */
     private _buildSyntaxHover(document: vscode.TextDocument, position: vscode.Position, wordRange: vscode.Range): vscode.Hover | null {
         const registry = getSyntaxRegistry();
-        if (!registry) return null;
+        if (!registry) {return null;}
 
         const lineText = document.lineAt(position.line).text;
         const ctx = registry.contextFor(document);
@@ -147,7 +147,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
             entry = registry.findMatch(lineText, null);
             available = false;
         }
-        if (!entry) return null;
+        if (!entry) {return null;}
 
         const language = vscode.workspace.getConfiguration('vskript').get<string>('language') || 'en';
         return new vscode.Hover(buildSyntaxMarkdown(entry, language, available), wordRange);
@@ -212,7 +212,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
 
             // 첫 번째 실제 코드가 나왔을 때 들여쓰기가 존재하지 않는다면 함수가 완전히 끝난 것임
             const match = line.match(/^([\s\t]+)/);
-            if (!match) break; 
+            if (!match) {break;} 
 
             bodyLines.push(line);
             nextIdx++;

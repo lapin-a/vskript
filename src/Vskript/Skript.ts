@@ -1,7 +1,7 @@
-import { workspace, window } from 'vscode'
-import * as FileSystem from 'fs'
-import * as Path from 'path'
-import * as vscode from 'vscode' // Uri 타입을 위해 vscode 임포트 추가
+import { workspace, window } from 'vscode';
+import * as FileSystem from 'fs';
+import * as Path from 'path';
+import * as vscode from 'vscode'; // Uri 타입을 위해 vscode 임포트 추가
 import { SkriptDocument, SkriptPath } from './SkriptDocument';
 
 // [오타 교정] WORKSAPCE_FATH -> WORKSPACE_FOLDERS
@@ -35,7 +35,7 @@ export function scanSingleFile(uri: vscode.Uri): SkriptDocument {
 	
 	// 이미 인덱싱된 문서가 있다면 중복 등록 방지하고 즉시 반환
 	let existing = find(fsPath);
-	if (existing) return existing;
+	if (existing) {return existing;}
 
 	// 워크스페이스 루트 경로 추적 (없을 시 파일의 부모 폴더를 임시 루트로 지정)
 	let root = workspace.workspaceFolders?.[0]?.uri.fsPath || Path.dirname(fsPath);
@@ -61,9 +61,9 @@ export function removeDocument(fsPath: string): void {
 
 /** 경로와 같은 SkriptFile이 있으면 반환 */
 export function find(fsPath:string): SkriptDocument | undefined {
-	for (const document of DOCUMENTS) if (document.skPath.fsPath === fsPath) {
+	for (const document of DOCUMENTS) {if (document.skPath.fsPath === fsPath) {
 		return document;
-	}
+	}}
 	return;
 }
 
@@ -76,12 +76,12 @@ async function _getSkriptPaths(loopPath: SkriptPath): Promise<SkriptPath[]> {
 			continue;
 		}
 		if (file.isDirectory()) {
-			skPathArray.push(...await _getSkriptPaths(skPath))
+			skPathArray.push(...await _getSkriptPaths(skPath));
 		} else if (Path.extname(file.name) === '.sk') {
 			skPathArray.push(skPath);
 		}
 	};
 	return new Promise((resolve) => {
 		resolve(skPathArray);
-	})
+	});
 }

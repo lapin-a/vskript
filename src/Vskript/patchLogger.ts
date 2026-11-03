@@ -12,7 +12,7 @@ const interceptor = function(originalFn: any, ...args: any[]) {
         const fileMatch = fullLogMessage.match(/([^\\\/]+\.sk)/i);
         if (fileMatch && fileMatch[1]) {
             const fileName = fileMatch[1].trim();
-            if (fileName.startsWith('-')) return; // 하이픈 비활성화 파일 출력 전면 차단
+            if (fileName.startsWith('-')) {return;} // 하이픈 비활성화 파일 출력 전면 차단
             
             if (fullLogMessage.includes('[즉시 스캔 완료]')) {
                 originalFn(`[즉시 스캔 완료] ${fileName}`);

@@ -1,4 +1,4 @@
-import { Color, ColorInformation, ColorPresentation, DocumentColorProvider, Position, Range, TextDocument, TextEdit } from 'vscode'
+import { Color, ColorInformation, ColorPresentation, DocumentColorProvider, Position, Range, TextDocument, TextEdit } from 'vscode';
 
 export class SkriptDocumentColorProvider implements DocumentColorProvider {
     public provideDocumentColors(document: TextDocument): ColorInformation[] {

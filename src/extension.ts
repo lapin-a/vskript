@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Skript from './Vskript/Skript';
 import * as Provider from './Vskript/provider/Provider';
-import TextDocumentChangeEvent from './Vskript/event/TextDocumentChangeEvent';
+import onTextDocumentChange from './Vskript/event/TextDocumentChangeEvent';
 import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
 import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
 import { initSyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
@@ -14,10 +14,10 @@ import { ServerEnvironmentManager, getEnvironment } from './Vskript/env/ServerEn
  * [최적화] 진단 연산을 비동기로 격리하여 메인 UI 스레드 프리징을 원천 차단합니다.
  */
 export function updateAllDiagnostics(document: vscode.TextDocument) {
-    if (!document) return;
+    if (!document) {return;}
     const isSkFile = document.uri.fsPath.endsWith('.sk');
     const isVSkriptLanguage = document.languageId === 'vskript';
-    if (!isSkFile && !isVSkriptLanguage) return;
+    if (!isSkFile && !isVSkriptLanguage) {return;}
 
     // 🌟 [핵심] 무거운 정규식 진단 연산을 비동기 큐로 빼서 파일 오픈/전환 렉을 완전히 소멸시킵니다.
     setTimeout(() => {
@@ -52,7 +52,7 @@ export async function activate(context: ExtensionContext) {
             const fileMatch = fullLogMessage.match(/([^\\\/]+\.sk)/i);
             if (fileMatch && fileMatch[1]) {
                 const fileName = fileMatch[1].trim();
-                if (fileName.startsWith('-')) return; 
+                if (fileName.startsWith('-')) {return;} 
                 
                 if (fullLogMessage.includes('[즉시 스캔 완료]')) {
                     originalFn(`[즉시 스캔 완료] ${fileName}`);
@@ -80,7 +80,7 @@ export async function activate(context: ExtensionContext) {
         // 환경 변경 → 레지스트리 재로딩 → 진단 갱신
         syntaxRegistry.onDidReload(() => {
             const editor = vscode.window.activeTextEditor;
-            if (editor) updateAllDiagnostics(editor.document);
+            if (editor) {updateAllDiagnostics(editor.document);}
         }),
         // plugins 폴더를 아직 못 찾았다면, 다른 .sk 파일을 열 때 다시 찾아본다
         vscode.window.onDidChangeActiveTextEditor(editor => {
@@ -112,7 +112,7 @@ export async function activate(context: ExtensionContext) {
                 if (fs.existsSync(currentFolderPath)) {
                     const siblingFiles = fs.readdirSync(currentFolderPath);
                     siblingFiles.forEach(file => {
-                        if (file.startsWith('-') || !file.endsWith('.sk')) return;
+                        if (file.startsWith('-') || !file.endsWith('.sk')) {return;}
                         
                         const targetFullPath = path.join(currentFolderPath, file);
                         const targetUri = vscode.Uri.file(targetFullPath);
@@ -137,7 +137,7 @@ export async function activate(context: ExtensionContext) {
                 const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
                 let skDocument = Skript.find(fsPath);
                 // 저장되지 않은 문서(untitled 등)는 디스크에 파일이 없으므로 스캔하지 않는다
-                if (!skDocument && document.uri.scheme === 'file') skDocument = Skript.scanSingleFile(document.uri);
+                if (!skDocument && document.uri.scheme === 'file') {skDocument = Skript.scanSingleFile(document.uri);}
                 
                 // 비동기로 격리된 진단 연산 호출
                 updateAllDiagnostics(document);
@@ -148,12 +148,12 @@ export async function activate(context: ExtensionContext) {
             }
         }),
         workspace.onDidChangeTextDocument(async (event) => {
-            TextDocumentChangeEvent(event);
+            onTextDocumentChange(event);
         }),
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('vskript')) {
                 const editor = vscode.window.activeTextEditor;
-                if (editor) updateAllDiagnostics(editor.document);
+                if (editor) {updateAllDiagnostics(editor.document);}
             }
         }),
         skriptDiagnostics

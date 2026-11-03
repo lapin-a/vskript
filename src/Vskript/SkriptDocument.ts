@@ -48,7 +48,7 @@ export class SkriptDocument {
 	}
 
 	public getText(range?: Range): string {
-		if (!range) return this._document;
+		if (!range) {return this._document;}
 		let start = this.offsetAt(range.start);
 		let end = this.offsetAt(range.end);
 		return this._document.substring(start, end);
@@ -59,14 +59,14 @@ export class SkriptDocument {
 	public getRange(text: string, fromIndex: number = 0): Range | undefined {
 		let index = this._document.indexOf(text, fromIndex); // indexOf에 시작 위치 전달
 		if (index < 0)
-			return
+			{return;}
 
 		let start = this.positionAt(index);
 		let end = this.positionAt(index + text.length);
 		if (start && end)
-			return new Range(start, end);
+			{return new Range(start, end);}
 		else
-			return;
+			{return;}
 	}
 
 	/** [추가된 함수] Position에 맞는 요소를 반환 */
@@ -103,9 +103,9 @@ export class SkriptDocument {
 
 	public getComponents<T extends SkriptComponent>(clazz:Class<T>): T[] {
 		let array = new Array<T>();
-		for (const value of this._components) if (value instanceof clazz) {
+		for (const value of this._components) {if (value instanceof clazz) {
 			array.push(value);
-		}
+		}}
 		return array;
 	}
 
@@ -121,7 +121,7 @@ export class SkriptDocument {
 		this._detectVersion();
 		this._detectAddons(); // [추가] 애드온 감지 실행
 		this._updateSkriptLine();
-		this._updateSkriptParagraph()
+		this._updateSkriptParagraph();
 	}
 
 	private _detectVersion() {
@@ -164,7 +164,7 @@ export class SkriptDocument {
 			this._skLines.push(new SkriptLine(offset, code, match[0]));
 			offset += code.length + match[0].length;
 			document = document.substring(match.index! + match[0].length);
-			if (document.length <= 0) break;
+			if (document.length <= 0) {break;}
 		}
 	}
 
@@ -200,7 +200,7 @@ export class SkriptDocument {
 						this._components.push(skParagraph);
 						if (groups.comment) {
 							let tooltip = this._trimToolTip(groups.comment);
-							if (tooltip) skParagraph.setToolTip(new SkriptToolTip(skParagraph, tooltip));
+							if (tooltip) {skParagraph.setToolTip(new SkriptToolTip(skParagraph, tooltip));}
 						}
 					}
 				}
@@ -232,7 +232,7 @@ export class SkriptDocument {
 				lines.splice(i,1);
 			} else { break; }
 		}
-		if (lines.length === 0) return "";
+		if (lines.length === 0) {return "";}
 		let start = lines[0];
 		let end = lines[lines.length - 1];
 		return paragraph.substring(start.offset, end.offset + end.text.length);
@@ -256,7 +256,7 @@ export class SkriptLine {
 			lines.push(line);
 			index += line.text.length + line.feed.length;
 			copy = copy.substring(search.index! + line.feed.length);
-			if (copy.length <= 0) break;
+			if (copy.length <= 0) {break;}
 		}
 		return lines;
 	}

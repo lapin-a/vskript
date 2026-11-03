@@ -38,16 +38,16 @@ export class SkriptParagraph {
 
 	private _setVariables() {
 
-		let local_index = this._skDocument.offsetAt(this._range.start);
+		let localIndex = this._skDocument.offsetAt(this._range.start);
 
 		let position = 0;
 		let index;
 		do {
 			index = this._paragraph.indexOf('{', position);
 			if (index > 0) {
-				let variable = this._findVariable(this._paragraph, index, local_index);
+				let variable = this._findVariable(this._paragraph, index, localIndex);
 				if (!variable)
-					break;
+					{break;}
 				this._variables.push(variable);
 
 				position = index + variable.expr.length + 1;
@@ -56,7 +56,7 @@ export class SkriptParagraph {
 		while (index > 0);
 	}
 
-	private _findVariable(paragraph:string, index:number, local_index:number): SkriptVariable | undefined {
+	private _findVariable(paragraph:string, index:number, localIndex:number): SkriptVariable | undefined {
 		if (index > 0) {
 			paragraph = paragraph.substr(index);
 		}
@@ -74,7 +74,7 @@ export class SkriptParagraph {
 		while (search = regexp.exec(paragraph)) {
 			if (search[0] === opener) {
 				if (start < 0)
-					start = search.index;
+					{start = search.index;}
 				stack ++;
 
 			} else if (search[0] === nest) {
@@ -85,7 +85,7 @@ export class SkriptParagraph {
 					isNested = false;
 				} else {
 					isNested = true;
-					let v = this._findVariable(paragraph, search.index + 1, local_index + index);
+					let v = this._findVariable(paragraph, search.index + 1, localIndex + index);
 					if (v) {
 						regexp.lastIndex = search.index + v.expr.length + 1;
 						child.push(v);
@@ -99,7 +99,7 @@ export class SkriptParagraph {
 				stack--;
 				if (stack === 0) {
 					let expr = paragraph.substring(start, search.index + 1);
-					let ragne = new Range(this._skDocument.positionAt(local_index + index + start)!, this._skDocument.positionAt(local_index + index + start + expr.length)!);
+					let ragne = new Range(this._skDocument.positionAt(localIndex + index + start)!, this._skDocument.positionAt(localIndex + index + start + expr.length)!);
 					let variable = new SkriptVariable(ragne, expr, expr);
 					variable.child.push(...child);
 					return variable;

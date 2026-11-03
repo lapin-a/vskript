@@ -146,7 +146,7 @@ const TYPE_REGEXP: Map<RegExp, SkriptLanguageType> = (() => {
 export class SkriptType {
 
     public static create(type: string): SkriptType {
-        if (!type) return new SkriptType(SkriptLanguageType.UNDEFINED);
+        if (!type) {return new SkriptType(SkriptLanguageType.UNDEFINED);}
         
         const cleanType = type.trim().toLowerCase();
         

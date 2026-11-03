@@ -10,15 +10,15 @@ let diagnosticTimeout: NodeJS.Timeout | undefined;
 /**
  * 문서 수정 이벤트 핸들러
  */
-export default function TextDocumentChangeEvent(event: vscode.TextDocumentChangeEvent) {
+export default function onTextDocumentChange(event: vscode.TextDocumentChangeEvent) {
     const document = event.document;
-    if (document.languageId !== 'vskript') return;
+    if (document.languageId !== 'vskript') {return;}
 
     // URI 형식을 강제로 통일하여 경로 엇박자 오류 방어
     const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath; 
 
     const changes = event.contentChanges;
-    if (changes.length === 0) return;
+    if (changes.length === 0) {return;}
 
     // 🌟 [최적화 핵심 1] 렉을 유발하던 무거운 데이터 모델 파싱과 진단 작업을 
     // 통째로 디바운싱 타이머 내부로 격리합니다. 유저가 타자를 치는 동안에는 CPU 연산이 완전히 멈추고 쾌적해집니다!
@@ -64,7 +64,7 @@ function inputEnter(context: vscode.TextDocumentContentChangeEvent, document: vs
     
     if (groups) {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+        if (!editor) {return;}
 
         const prefix = groups.prefix;
             
@@ -74,10 +74,10 @@ function inputEnter(context: vscode.TextDocumentContentChangeEvent, document: vs
             });
 
             const skDocument = Skript.find(document.uri.fsPath);
-            if (!skDocument) return;
+            if (!skDocument) {return;}
 
             const skFunction = skDocument.componentOf(context.range.start, {isAfter:true});
-            if (!skFunction || !(skFunction instanceof SkriptFunction)) return;
+            if (!skFunction || !(skFunction instanceof SkriptFunction)) {return;}
 
             const docs = new Array<string>();
             let j = 1;
@@ -86,7 +86,7 @@ function inputEnter(context: vscode.TextDocumentContentChangeEvent, document: vs
                     docs.push(`#> @param ${param.name} \${${j++}}`);
                 }
             }
-            if (skFunction.returnType) docs.push(`#> @return \${${j++}}`);
+            if (skFunction.returnType) {docs.push(`#> @return \${${j++}}`);}
             docs.unshift(`#> \${${j}}`);
             
             editor.insertSnippet(new vscode.SnippetString(docs.join('\r\n')), context.range);

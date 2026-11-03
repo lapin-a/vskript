@@ -29,7 +29,7 @@ export abstract class SkriptComponent {
 	public setToolTip(skTooltip:SkriptToolTip) { this._skToolTip = skTooltip; }
 
 	get isInvisible(): boolean {
-		if (!this._skToolTip) return false;
+		if (!this._skToolTip) {return false;}
 		return this._skToolTip.option.invisible;
 	}
 
@@ -38,7 +38,7 @@ export abstract class SkriptComponent {
 	// 인수를 3개로 고정하여 외부에서 계산된 정확한 Range를 주입받습니다.
 	public static create(skDocument: SkriptDocument, component: string, range?: Range): SkriptComponent | undefined {
 		let targetRange = range || skDocument.getRange(component);
-		if (!targetRange) return;
+		if (!targetRange) {return;}
 
 		let search;
 		// options: 뒤에 공백이나 주석이 있어도 잡을 수 있게 수정된 정규표현식
@@ -70,7 +70,7 @@ export abstract class SkriptComponent {
 		let phrases = new Array<SkriptKeyValue<string[]>>();
 		for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
 			let groups = line.text.match(/(?:\t|\s{4})(?<aliase>(?<key>[^\=]+)\=(?<values>[^#]*))/)?.groups;
-			if (!groups) continue;
+			if (!groups) {continue;}
 			let aliase = groups.aliase.trim();
 			let start = line.offset + line.text.indexOf(aliase);
 			let phrase: SkriptKeyValue<string[]> = {
@@ -87,7 +87,7 @@ export abstract class SkriptComponent {
 		let phrases = new Array<SkriptKeyValue<string>>();
 		for (const line of SkriptLine.split(_component, _skDocument.offsetAt(_range.start))) {
 			let groups = line.text.match(/(?:\t|\s{4})(?<option>(?<key>[^\:]+)\:(?<value>(\<\#\#\w*\>|[^#])*))/)?.groups;
-			if (!groups) continue;
+			if (!groups) {continue;}
 			let option = groups.option.trim();
 			let start = line.offset + line.text.indexOf(option);
 			let phrase: SkriptKeyValue<string> = {
@@ -130,13 +130,13 @@ export abstract class SkriptComponent {
 		let options = new Array<SkriptKeyValue<string>>();
 		let match =_component.match(/(?!\r\n|\r|\n)(\t|\s{4})([^:]*)\:(.*)((\r\n|\r|\n)((\t|\s)*\#.*|(\t|\s{4}){2}.*))*/ig);
 
-		if (match) for (const m of match) {
+		if (match) {for (const m of match) {
 			let groups = m.match(/(\t|\s{4})*(?<option>(?<key>[^\t\s][^:]*)\:(?<value>.*)((\r\n|\r|\n)(?<paragraph>((\W[^\r\n]*)?(\r\n|\r|\n)?)+))?)/)?.groups;
 			if (groups) {
 				let index = offset + _component.indexOf(groups.option);
 				let start = _skDocument.positionAt(index);
 				let end = _skDocument.positionAt(index + groups.option.length);
-				if (!start || !end) continue;
+				if (!start || !end) {continue;}
 				let key = groups.key.trim().toLowerCase();
 				if (key !== 'trigger') {
 					options.push({key: key, value: groups.value.trim(), range: new Range(start, end)});
@@ -147,8 +147,8 @@ export abstract class SkriptComponent {
 					}
 				}
 			}
-		}
-		if (options.length > 0 ) info.options = options;
+		}}
+		if (options.length > 0 ) {info.options = options;}
 		let skCommand = new SkriptCommand(_skDocument, _range, info);
 		if (paragraph) {
 			skCommand.paragraph = new SkriptParagraph(skCommand, paragraph.range, paragraph.text);
@@ -224,7 +224,7 @@ export class SkriptAliases extends SkriptMapComponent {
 	private readonly _aliases = new Array<SkriptKeyValue<string[]>>();
 
 	constructor(skDocument:SkriptDocument, range:Range, aliases:SkriptKeyValue<string[]> []) {
-		super(skDocument, range, 'alaises')
+		super(skDocument, range, 'alaises');
 		this._aliases.push(...aliases);
 	}
 
@@ -236,7 +236,7 @@ export class SkriptAliases extends SkriptMapComponent {
 	}
 
 	public get aliases(){
-		return this._aliases
+		return this._aliases;
 	}
 
 }
@@ -248,7 +248,7 @@ export class SkriptOptions extends SkriptMapComponent {
 	private readonly _options = new Array<SkriptKeyValue<string>>();
 
 	constructor(skDocument:SkriptDocument, range:Range, options:SkriptKeyValue<string>[]) {
-		super(skDocument, range, 'options')
+		super(skDocument, range, 'options');
 		this._options.push(...options);
 	}
 
@@ -260,7 +260,7 @@ export class SkriptOptions extends SkriptMapComponent {
 	}
 
 	public get options(){
-		return this._options
+		return this._options;
 	}
 
 }
@@ -296,25 +296,25 @@ export class SkriptCommand extends SkriptParagraphComponent {
 	private readonly _info?: SkriptCommandInfomation;
 
 	constructor(skDocument:SkriptDocument, range:Range, info?:SkriptCommandInfomation) {
-		let title = 'command'
+		let title = 'command';
 		if (info) {
-			if (info.label) title +=  ` /${info.label}`;
-			if (info.arguments) title += ` ${info.arguments}`;
+			if (info.label) {title +=  ` /${info.label}`;}
+			if (info.arguments) {title += ` ${info.arguments}`;}
 		}
 		super(skDocument, range, title);
 		this._info = info;
 	}
 
 	get label() {
-		return this._info?.label
+		return this._info?.label;
 	}
 
 	get arguments() {
-		return this._info?.arguments
+		return this._info?.arguments;
 	}
 
 	get options() {
-		return this._info?.options
+		return this._info?.options;
 	}
 
 	/** ```
@@ -350,7 +350,7 @@ export class SkriptFunction extends SkriptParagraphComponent {
 		for (const parameter of info.parameters!) {
 			let text = `${parameter.name}:${parameter.type.text}`;
 			if (parameter.default)
-				text += `=${parameter.default}`
+				{text += `=${parameter.default}`;}
 			parameters.push(text);
 		}
 		let title = `${info.name}(${parameters.join(', ')})${(info.type) ? ` :: ${info.type.text}:` : `:`}`;
@@ -398,10 +398,10 @@ export class SkriptToolTip {
 	constructor(skParagraph:SkriptComponent, tooltip:string[]) {
 		this._skParagraph = skParagraph;
 		this._tooltip = tooltip;
-		this._skCompOption = {invisible: false}
+		this._skCompOption = {invisible: false};
 		tooltip.forEach(line => {
-			if (line.match(/\@invisible/i)) this._skCompOption.invisible = true;
-		})
+			if (line.match(/\@invisible/i)) {this._skCompOption.invisible = true;}
+		});
 	}
 
 	get option(): SkriptComponentOption {
@@ -411,12 +411,12 @@ export class SkriptToolTip {
 	get markdown(): MarkdownString {
 		if (!this._markdown) {
 			let docs = new Array<string>();
-			let regex_parm = /(\@param)\s(\w*)\s(.*)/g;
-			let regex_return = /(\@return)\s(.*)/g;
+			let regexParam = /(\@param)\s(\w*)\s(.*)/g;
+			let regexReturn = /(\@return)\s(.*)/g;
 			for (const line of this._tooltip) {
 				docs.push(line
-					.replace(regex_parm, '_$1_ ```$2``` ─ $3')
-					.replace(regex_return, '_$1_ ─ $2')
+					.replace(regexParam, '_$1_ ```$2``` ─ $3')
+					.replace(regexReturn, '_$1_ ─ $2')
 				);
 			}
 			this._markdown = new MarkdownString()

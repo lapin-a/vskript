@@ -2,11 +2,11 @@ export type Class<T> = { new (...args: any[]): T };
 
 export class JavaObject {
     public equals(obj: any): boolean {
-        if (this === obj) return true;
-        if (!obj || Object.keys(this).length !== Object.keys(obj).length) return false;
+        if (this === obj) {return true;}
+        if (!obj || Object.keys(this).length !== Object.keys(obj).length) {return false;}
         
         for (const field in this) {
-            if (this[field] !== obj[field]) return false;
+            if (this[field] !== obj[field]) {return false;}
         }
         return true;
     }
@@ -26,7 +26,7 @@ export class StringBuilder {
     private readonly _strings = new Array<string>();
 
     constructor(string?: string) {
-        if (string) this.append(string);
+        if (string) {this.append(string);}
     }
 
     public get length(): number {
@@ -113,13 +113,13 @@ export class ComparableStream<T> extends Stream<T> {
     }
 
     public min(): T | undefined {
-        if (this._values.length === 0) return undefined;
+        if (this._values.length === 0) {return undefined;}
         let result = this._values[0];
         const len = this._values.length;
         for (let i = 1; i < len; i++) {
             const v = this._values[i];
             try {
-                if (this._comparator.call(this, result, v) > 0) result = v;
+                if (this._comparator.call(this, result, v) > 0) {result = v;}
             } catch (error) {
                 return undefined;
             }
@@ -128,13 +128,13 @@ export class ComparableStream<T> extends Stream<T> {
     }
 
     public max(): T | undefined {
-        if (this._values.length === 0) return undefined;
+        if (this._values.length === 0) {return undefined;}
         let result = this._values[0];
         const len = this._values.length;
         for (let i = 1; i < len; i++) {
             const v = this._values[i];
             try {
-                if (this._comparator.call(this, result, v) < 0) result = v;
+                if (this._comparator.call(this, result, v) < 0) {result = v;}
             } catch (error) {
                 return undefined;
             }
