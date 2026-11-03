@@ -51,4 +51,4 @@
 ## 완료된 항목
 
 - [x] **빌드 깨짐 수정**: 커밋 `a7c4ff1`에서 `SkriptCompletionItemProvider.ts`가 `SkriptDocumentSymbolProvider`와 거의 동일한 코드로 덮어써져 `tsc` 컴파일이 실패하던 문제 → 직전 버전(`a7c4ff1^`)으로 복원. 자동완성 쪽에서 의도했던 변경이 있었다면 다시 적용 필요.
-- [x] **VS Code 버전 불일치 수정**: `engines.vscode`(`^1.56.0`)와 `@types/vscode`(`^1.120.0`)가 달라 `vsce package`가 거부되던 문제 → 기준을 1.120.0으로 통일 (`engines.vscode`, `@types/vscode` `^1.120.0`, `@types/vscode` `~1.120.0`로 고정 — `^`이면 1.144가 설치되어 vsce가 다시 거부함). VS Code 1.120 미만은 더 이상 지원하지 않음.
+- [x] **VS Code 버전 불일치 수정**: `engines.vscode`(`^1.56.0`)와 `@types/vscode`(`^1.120.0`)가 달라 `vsce package`가 거부되던 문제 → 기준을 1.120.0으로 통일 (`engines.vscode`는 `^1.120.0`, `@types/vscode`는 `~1.120.0`으로 고정 — `^`로 두면 1.144가 설치되어 vsce가 다시 거부함). VS Code 1.120 미만은 더 이상 지원하지 않음.
