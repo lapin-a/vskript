@@ -24,6 +24,9 @@
 	- The v0.1.0 source did not compile
 	- Opening a new unsaved document caused an error
 	- Code snippets were not registered
+	- Function parameter types were shown as `[object Object]` in the outline
+	- Running "re-detect" during a syntax data sync did not apply changed settings right away
+	- The extension altered other extensions' logs (`console.log`); logs now go to the `VSkript` channel in the Output panel
 
 # Update v0.1.0
 1. Diagnostics
