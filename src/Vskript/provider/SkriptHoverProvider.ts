@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Skript from "../Skript";
+import { buildSyntaxMarkdown, getSyntaxRegistry } from '../syntax/SyntaxRegistry';
 
 /**
  * [Step 9 고도화] 설정창 분기 연동형 다기능 호버 제공자
@@ -125,7 +126,31 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
             console.error("🚨 [SkriptHoverProvider] 캐시 서치 예외 방어:", error);
         }
 
-        return null;
+        // 3단계: Skript/애드온 구문 (SyntaxRegistry)
+        return this._buildSyntaxHover(document, position, wordRange);
+    }
+
+    /**
+     * 커서가 있는 줄을 구문 데이터와 대조해 설명을 보여 준다.
+     * vskript.language가 ko이고 번역(guide.description)이 있으면 한국어 설명을 쓴다.
+     * 현재 버전에서 유효한 구문을 먼저 찾고, 없으면 버전과 무관하게 찾아 "사용 불가"로 표시한다.
+     */
+    private _buildSyntaxHover(document: vscode.TextDocument, position: vscode.Position, wordRange: vscode.Range): vscode.Hover | null {
+        const registry = getSyntaxRegistry();
+        if (!registry) return null;
+
+        const lineText = document.lineAt(position.line).text;
+        const ctx = registry.contextFor(document);
+        let entry = registry.findMatch(lineText, ctx);
+        let available = true;
+        if (!entry) {
+            entry = registry.findMatch(lineText, null);
+            available = false;
+        }
+        if (!entry) return null;
+
+        const language = vscode.workspace.getConfiguration('vskript').get<string>('language') || 'en';
+        return new vscode.Hover(buildSyntaxMarkdown(entry, language, available), wordRange);
     }
 
     /**

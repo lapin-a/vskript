@@ -12,16 +12,6 @@
 
 ## 🔴 높음
 
-### H1. 내려받은 DataPack을 자동완성/호버/진단에 연결
-
-- **현재 상태**: 서버 환경 감지와 DataPack 다운로드·캐시는 동작하지만(`src/Vskript/env/`), 받은 데이터는 아직 **Skript 버전 결정에만** 쓰임. 자동완성·호버·진단은 여전히 번들 `core_syntax.json`을 각자 따로 읽음 (진단·자동완성·SkriptHubClient 3곳).
-- **해야 할 일**:
-  - [ ] `core_syntax.json`과 DataPack을 합친 단일 구문 저장소(레지스트리)를 만들고 세 곳이 그것만 보도록 정리
-  - [ ] 버전 필터: `valid_from_addon_version_parsed`로 현재 Skript/애드온 버전에서 유효한 구문만 제안
-  - [ ] 호버에 `guide.description`(한국어) 표시 (`vskript.language: ko`일 때)
-  - [ ] `onDidChangeEnvironment` 이벤트로 데이터 갱신 시 재로딩
-- **선행 조건**: vskript-database의 schema 2 DataPack이 GitHub에 push되어야 원격 다운로드가 동작함 (현재 원격은 schema 1 → 확장이 "지원하지 않는 형식"으로 거부하고 캐시/번들 데이터로 동작)
-
 ### H2. 전역 `console.log` 가로채기
 
 - **현재 상태**: `extension.ts`의 `activate()`에서 `console.log`/`console.info`를 전역으로 덮어씀. 같은 확장 호스트에서 돌아가는 **다른 확장의 로그까지 변형·누락**될 수 있으며, `deactivate()`에서 복원하지 않음.
@@ -29,12 +19,12 @@
   - [ ] `vscode.window.createOutputChannel('VSkript')` 기반 전용 로거로 교체하고 전역 패치 제거
   - [ ] 미사용 `src/Vskript/patchLogger.ts`도 함께 삭제 (같은 방식의 패치 코드)
 
-### H3. 자동완성(Completion) 복원본 검증
+### H3. 자동완성(Completion) 실제 동작 검증
 
-- **현재 상태**: 커밋 `a7c4ff1`에서 덮어써진 `SkriptCompletionItemProvider.ts`를 직전 버전(`a7c4ff1^`)으로 복원함. 컴파일은 되지만 **실제 자동완성 동작은 미확인**이며, 그 커밋에서 의도했던 변경("use DocumentSymbol")이 있었다면 누락된 상태.
+- **현재 상태**: H1 작업으로 `SkriptCompletionItemProvider.ts`를 `SyntaxRegistry` 기반으로 다시 작성함 (커밋 `a7c4ff1` 복원본 문제는 해소). 컴파일·레지스트리 단위 확인은 했지만 **확장을 실행한 상태의 자동완성 동작은 미확인**.
 - **해야 할 일**:
-  - [ ] 확장 실행 후 자동완성(`{`, `@` 트리거, 함수 완성) 동작 확인
-  - [ ] `a7c4ff1` 작성자에게 의도했던 변경 내용 확인 후 필요하면 재적용
+  - [ ] 확장 실행 후 자동완성(`{@` 옵션, 구문 제안, 버전별 제안 수 변화), 호버(`vskript.language: ko`일 때 번역 설명) 동작 확인
+  - [ ] `a7c4ff1` 작성자에게 의도했던 변경("use DocumentSymbol") 확인 후 필요하면 재적용
 
 ---
 
@@ -49,9 +39,9 @@
 
 ### M2. 버전 호환성 진단 실제 동작 (README 불일치)
 
-- **현재 상태**: README는 "버전 호환성을 진단"한다고 설명하지만, `SkriptDiagnostics.ts`의 버전별 구문 검사는 `enableSyntaxCheck = false`로 꺼져 있고 `checkVersionCompatibility()`는 빈 배열만 반환. 버전 결정(파일 주석 > 서버 환경 > 기본 2.7)은 이제 동작함.
+- **현재 상태**: README는 "버전 호환성을 진단"한다고 설명하지만, 진단의 버전 검사는 `enableSyntaxCheck = false`로 꺼져 있음. H1에서 검사 로직을 `SyntaxRegistry` 기준(현재 버전에 유효한 구문이 없고 다른 버전에는 있을 때 경고)으로 바꿔 두었고, 버전 결정은 파일 주석(`# version:` > `# mc:`) > 서버 환경 > 미상(미상이면 검사 안 함).
 - **해야 할 일**:
-  - [ ] H1(DataPack 연결) 후 버전 검사 활성화
+  - [ ] 패턴 매칭 정확도 확인 후 검사 활성화 (가짜 경고 여부를 실제 스크립트로 확인; `findMatch`는 줄 단위 전체 매칭이라 표현식 중첩은 못 봄)
   - [ ] 그 전까지 README 설명을 실제 동작에 맞게 정정
 
 ### M3. 스니펫 동작 확인
@@ -71,7 +61,7 @@
   - 코드: `src/Java.ts` (`patchLogger.ts`는 H2에서 처리)
   - 리소스: `assets/ko_dict.json`, `src/resource/addon_syntax.json`, `src/resource/lang/default.lang`
 - **해야 할 일**:
-  - [ ] 연결할지 삭제할지 결정 (`ko_dict.json`은 `vskript.language: ko` 설정과 연결 의도로 보임)
+  - [ ] 삭제 검토 (`ko_dict.json`의 역할은 DataPack의 `guide.description`이 대신함 — H1)
 
 ### L2. 테스트 / 린트
 
@@ -91,6 +81,13 @@
 
 ## 완료된 항목
 
+- [x] **H1. 내려받은 DataPack을 자동완성/호버/진단에 연결** (2026-11-03): `src/Vskript/syntax/`
+  - `SyntaxRegistry`: 번들 `core_syntax.json` + DataPack을 하나로 합친 구문 저장소. Skript DataPack이 있으면 번들 core 대신 사용(번들은 오프라인·캐시 없음일 때 폴백). 자동완성·호버·진단은 이것만 봄 → `SkriptHubClient` 삭제(쓰이지 않던 `globalStorage/syntax_db.json` 쓰기도 제거)
+  - 버전 필터(`SyntaxVersion`): `valid_from_addon_version_parsed`(+`valid_until_*`) 기준, 비교 규칙은 vskript-database `version.js`의 `compareVersions`와 동일. 설치 버전을 모르거나 시작 버전이 부정확(`before`/`or_earlier`/`unknown`)하면 숨기지 않음. Skript 버전 = 파일 주석 > 서버 환경, 애드온 버전 = 서버 환경
+  - 호버: 옵션·함수 다음으로 구문 호버 추가. `vskript.language: ko`이고 번역이 있으면 `guide.description`(stale이면 표시), 아니면 원문. 현재 버전에서 못 쓰는 구문이면 경고 표시
+  - `onDidChangeEnvironment` → 레지스트리 재로딩 → `onDidReload` → 진단 갱신
+  - `SkriptPattern`: Skript 패턴(`[]`, `(|)`, `%%`, `<>`, `1¦`, `tag:`)을 정규식·자동완성 레이블로 변환
+  - 자동완성에서 제거: `ko_dict` 읽기, 가짜 "온디맨드 애드온"(확장 설치 폴더에 mock JSON을 쓰던 코드)과 이에만 연결돼 있던 `# addons:` 주석. 구문 설명은 `resolveCompletionItem`에서 지연 생성
 - [x] **서버 환경 감지 + DataPack 다운로드** (2026-11-03): `src/Vskript/env/`
   - `plugins` 폴더 자동 탐색(`vskript.serverPath`로 지정 가능) → jar 안의 `plugin.yml`/`paper-plugin.yml`에서 이름·버전 읽기 (실패 시 파일명 추정)
   - 설정 `vskript.skriptVersion`, `vskript.addons`(`이름@버전`)가 감지 결과를 덮어씀. 감지값과 다르면 **같은 불일치당 알림 1회** (내용이 바뀌면 다시 알림, 명령 실행 시 항상 알림)

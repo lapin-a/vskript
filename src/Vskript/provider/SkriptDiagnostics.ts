@@ -1,60 +1,10 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import { getEffectiveSkriptVersion } from '../env/ServerEnvironment';
+import { getSyntaxRegistry } from '../syntax/SyntaxRegistry';
 
 export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vskript");
 
-let extensionRootPath: string = '';
-
-/**
- * extension.ts에서 활성화 시점에 주입해 주는 전역 확장 프로그램 루트 경로
- */
-export function setExtensionRootPath(rootPath: string) {
-    extensionRootPath = rootPath;
-}
-
-export function checkVersionCompatibility(_skDoc: any, _syncData: any): vscode.Diagnostic[] {
-    return []; 
-}
-
-function parseScriptVersionFromText(document: vscode.TextDocument): string | null {
-    const scanLines = Math.min(document.lineCount, 10);
-    for (let i = 0; i < scanLines; i++) {
-        const text = document.lineAt(i).text;
-        const match = text.match(/^\s*#\s*(?:version|v)\s*:\s*([0-9.]+)/i);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-    }
-    return null;
-}
-
-/**
- * [철벽 정제형 버전 비교 알고리즘]
- * v1이 v2보다 크거나 같으면 true, 작으면 false 리턴 (호환성 대조용 브릿지)
- */
-function isVersionCompatible(current: string, required: string): boolean {
-    return compareVersions(current, required) >= 0;
-}
-
-function compareVersions(v1: any, v2: any): number {
-    const cleanV1 = String(v1 || '2.7').replace(/[^\d.]/g, '');
-    const cleanV2 = String(v2 || '1.0').replace(/[^\d.]/g, '');
-
-    const finalV1 = cleanV1 === '' ? '2.7' : cleanV1;
-    const finalV2 = cleanV2 === '' ? '1.0' : cleanV2;
-
-    const p1 = finalV1.split('.').map(Number);
-    const p2 = finalV2.split('.').map(Number);
-
-    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-        const n1 = p1[i] || 0;
-        const n2 = p2[i] || 0;
-        if (n1 > n2) return 1;
-        if (n1 < n2) return -1;
-    }
-    return 0;
+export function checkVersionCompatibility(_skDoc: any): vscode.Diagnostic[] {
+    return [];
 }
 
 /**
@@ -111,54 +61,25 @@ function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[]
 /**
  * 핵심 실시간 진단 실행 엔진
  */
-export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any) {
+export function refreshDiagnostics(document: vscode.TextDocument) {
     if (!document) return;
 
     try {
         const entries: vscode.Diagnostic[] = [];
         const lineCount = document.lineCount;
 
-        // 버전 우선순위: 파일 상단 주석(# version: x.y) > 서버 환경(설정/plugins 감지) > 기본값 2.7
-        let currentVersion = '2.7';
-        const scriptTopVersion = parseScriptVersionFromText(document);
-        const environmentVersion = getEffectiveSkriptVersion();
-
-        if (scriptTopVersion) {
-            currentVersion = scriptTopVersion;
-        } else if (environmentVersion) {
-            currentVersion = environmentVersion;
-        }
-
-        // 숫자 부분만 사용 ("2.10.0-pre1" → "2.10.0"). 문자를 지우기만 하면 "2.10.01"처럼 틀어진다.
-        const numericVersion = String(currentVersion).match(/^\s*v?(\d+(?:\.\d+)*)/i);
-        currentVersion = numericVersion ? numericVersion[1] : '2.7';
-
-        // 🌟 [핵심 수술 부위: 절대 경로 락 패치 완료]
-        let syntaxPath = path.join(extensionRootPath, 'out', 'resource', 'core_syntax.json');
-        
-        if (!fs.existsSync(syntaxPath)) {
-            syntaxPath = path.join(extensionRootPath, 'src', 'resource', 'core_syntax.json');
-        }
-        
-        const fileExists = fs.existsSync(syntaxPath);
-        let syntaxDb: any = null;
-        let loadStatusText = '🚨 core_syntax.json 파일 유실됨';
-
-        if (fileExists) {
-            try {
-                syntaxDb = JSON.parse(fs.readFileSync(syntaxPath, 'utf-8'));
-                loadStatusText = '🟢 성공 (자원 바인딩 락 완료)';
-            } catch (jsonErr: any) {
-                loadStatusText = `❌ JSON 문법 에러: ${jsonErr.message}`;
-            }
-        }
-
-        console.log(`[Vskript] 진단 데이터 락 경로: ${path.basename(syntaxPath)} | 규격: v${currentVersion} | 결과: ${loadStatusText}`);
+        // 버전 검사: 구문 데이터(SyntaxRegistry)와 대조해 현재 버전에서 쓸 수 없는 구문을 경고.
+        // 버전 결정 = 파일 주석(# version: / # mc:) > 서버 환경 > 미상(미상이면 검사 안 함).
+        // 🌟 [임시 조치] 패턴 매칭 정확도 검증 전까지 가짜 경고를 막기 위해 꺼 둠 (TODO M2)
+        const enableSyntaxCheck = false;
+        const registry = getSyntaxRegistry();
+        const ctx = registry ? registry.contextFor(document) : null;
+        const versionCheck = enableSyntaxCheck && registry && ctx && ctx.skript ? { registry, ctx } : null;
 
         for (let i = 0; i < lineCount; i++) {
             const line = document.lineAt(i);
             const text = line.text;
-            
+
             const cleanText = text.replace(/#.*/, '').trim();
             if (cleanText === '') continue;
 
@@ -177,67 +98,16 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
                 ));
             }
 
-            // 🌟 [임시 조치 레이어] 애드온 구문 데이터 정밀 수집 전까지 가짜 경고 차단을 위해 'false'로 강제 락 처리 (Bypass)
-            const enableSyntaxCheck = false; 
-            
-            if (enableSyntaxCheck && syntaxDb) {
-                for (const key in syntaxDb) {
-                    const syntax = syntaxDb[key];
-                    if (!syntax || !syntax.name || !syntax.type || !syntax.patterns) continue;
-
-                    const koDesc = syntax.description && syntax.description.ko ? String(syntax.description.ko) : "";
-                    const isCore = koDesc.includes("공식 코어 구문") || String(syntax.addon).toLowerCase() === 'skript';
-                    
-                    let displayAddonName = isCore ? "Skript" : (syntax.addon ? String(syntax.addon) : "외부 애드온");
-                    if (!isCore && koDesc.includes(":")) {
-                        displayAddonName = koDesc.split("구문입니다")[0].trim();
-                    } else if (!isCore) {
-                        displayAddonName = String(syntax.name);
-                    }
-
-                    let rawAdded = "1.0";
-                    if (syntax.added) {
-                        rawAdded = Array.isArray(syntax.added) ? String(syntax.added[0] || "1.0") : String(syntax.added);
-                    }
-                    const versionMatch = rawAdded.match(/([0-9.]+)/);
-                    const requiredVersion = versionMatch ? versionMatch[1] : "1.0";
-
-                    const pureKeywords = ["stop", "else", "then", "implicit"];
-                    if (pureKeywords.includes(String(syntax.name).toLowerCase().trim())) continue;
-
-                    if (!isVersionCompatible(currentVersion, requiredVersion)) {
-                        syntax.patterns.forEach((pattern: string) => {
-                            let regexStr = pattern
-                                .replace(/[\[\]\^]/g, '')
-                                .replace(/\(.+?\)/g, '.*')
-                                .replace(/<.+?>/g, '.+')
-                                .trim();
-
-                            try {
-                                const matchRegex = new RegExp(`\\b${regexStr}\\b`, 'i');
-                                if (matchRegex.test(cleanText)) {
-                                    let alertMessage = "";
-                                    if (isCore) {
-                                        alertMessage = `⚠️ [vskript 버전 미달] 이 구문은 Skript 규격 v${requiredVersion} 이상부터 지원됩니다. (현재 파일 설정: v${currentVersion})`;
-                                    } else {
-                                        alertMessage = `🔌 [vskript 애드온 요구] 과거 버전 환경(v${currentVersion})에서 이 구문을 구동하려면 [${displayAddonName}] 관련 플러그인이 필요합니다. (요구 사양: v${requiredVersion}+)`;
-                                    }
-
-                                    const startChar = text.indexOf(text.trim());
-                                    const endChar = text.length;
-                                    const range = new vscode.Range(i, startChar, i, endChar);
-
-                                    const diagnostic = new vscode.Diagnostic(
-                                        range,
-                                        alertMessage,
-                                        vscode.DiagnosticSeverity.Warning
-                                    );
-                                    diagnostic.code = 'vskript-version-mismatch';
-                                    entries.push(diagnostic);
-                                }
-                            } catch (e) {}
-                        });
-                    }
+            // 2️⃣ [버전 검사] 현재 버전에서 유효한 구문이 없고, 다른 버전에서는 유효한 구문이 있을 때만 경고
+            if (versionCheck && !versionCheck.registry.findMatch(text, versionCheck.ctx)) {
+                const entry = versionCheck.registry.findMatch(text, null);
+                if (entry) {
+                    const installed = entry.addonKey === 'skript' ? versionCheck.ctx.skriptText : null;
+                    const message = `⚠️ [vskript] '${entry.title}'(${entry.addon})은 현재 버전${installed ? ` v${installed}` : ''}에서 사용할 수 없습니다.${entry.validFromText ? ` (지원: ${entry.validFromText})` : ''}`;
+                    const startChar = text.indexOf(text.trim());
+                    const diagnostic = new vscode.Diagnostic(new vscode.Range(i, startChar, i, text.length), message, vscode.DiagnosticSeverity.Warning);
+                    diagnostic.code = 'vskript-version-mismatch';
+                    entries.push(diagnostic);
                 }
             }
         }

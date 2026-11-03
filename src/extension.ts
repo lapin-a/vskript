@@ -6,11 +6,9 @@ import * as Skript from './Vskript/Skript';
 import * as Provider from './Vskript/provider/Provider';
 import TextDocumentChangeEvent from './Vskript/event/TextDocumentChangeEvent';
 import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
-import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics, setExtensionRootPath } from './Vskript/provider/SkriptDiagnostics';
-import { SkriptHubClient } from './Vskript/SkriptHubClient';
-import { ServerEnvironmentManager, onDidChangeEnvironment, getEnvironment } from './Vskript/env/ServerEnvironment';
-
-let hubClient: SkriptHubClient;
+import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
+import { initSyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
+import { ServerEnvironmentManager, getEnvironment } from './Vskript/env/ServerEnvironment';
 
 /**
  * [최적화] 진단 연산을 비동기로 격리하여 메인 UI 스레드 프리징을 원천 차단합니다.
@@ -25,14 +23,14 @@ export function updateAllDiagnostics(document: vscode.TextDocument) {
     setTimeout(() => {
         try {
             const finalDiagnostics: vscode.Diagnostic[] = [];
-            refreshDiagnostics(document, hubClient);
+            refreshDiagnostics(document);
             const syntaxEntries = skriptDiagnostics.get(document.uri) || [];
             finalDiagnostics.push(...syntaxEntries);
             
             const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
             const skDoc = Skript.find(fsPath);
-            if (skDoc && hubClient) {
-                const versionIssues = checkVersionCompatibility(skDoc, hubClient.getSyncData());
+            if (skDoc) {
+                const versionIssues = checkVersionCompatibility(skDoc);
                 finalDiagnostics.push(...versionIssues);
             }
             skriptDiagnostics.set(document.uri, finalDiagnostics);
@@ -70,18 +68,17 @@ export async function activate(context: ExtensionContext) {
     console.log = (...args: any[]) => logInterceptor(originalLog, ...args);
     console.info = (...args: any[]) => logInterceptor(originalInfo, ...args);
 
-    // 진단 원천 절대 경로 주입
-    setExtensionRootPath(context.extensionPath);
-
     console.log("--- vskript 확장 활성화 시작 ---");
-    hubClient = new SkriptHubClient(context);
+    // 구문 저장소(번들 core + DataPack). 서버 환경이 바뀌면 스스로 다시 읽는다.
+    const syntaxRegistry = initSyntaxRegistry(context);
 
     // 서버 환경(Skript 버전/애드온) 감지 + 구문 DataPack 동기화.
     // 네트워크를 쓰므로 활성화를 막지 않도록 기다리지 않는다.
     const environment = new ServerEnvironmentManager(context);
     context.subscriptions.push(
         environment,
-        onDidChangeEnvironment(() => {
+        // 환경 변경 → 레지스트리 재로딩 → 진단 갱신
+        syntaxRegistry.onDidReload(() => {
             const editor = vscode.window.activeTextEditor;
             if (editor) updateAllDiagnostics(editor.document);
         }),
@@ -150,7 +147,7 @@ export async function activate(context: ExtensionContext) {
             }
         }),
         workspace.onDidChangeTextDocument(async (event) => {
-            TextDocumentChangeEvent(event, hubClient);
+            TextDocumentChangeEvent(event);
         }),
         workspace.onDidChangeConfiguration(async (e) => {
             if (e.affectsConfiguration('vskript')) {

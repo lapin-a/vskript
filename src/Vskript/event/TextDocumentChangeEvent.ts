@@ -3,7 +3,6 @@ import * as Skript from '../Skript';
 import { SkriptFunction } from '../SkriptComponent';
 import { SYMBOLS_MAP } from '../provider/SkriptDocumentSymbolProvider';
 import { refreshDiagnostics } from '../provider/SkriptDiagnostics';
-import { SkriptHubClient } from '../SkriptHubClient';
 
 // 🌟 [최적화 핵심] 타이핑 도중 폭발적으로 일어나는 파싱 및 진단 연산을 통제하는 단일 타이머 주머니
 let diagnosticTimeout: NodeJS.Timeout | undefined;
@@ -11,7 +10,7 @@ let diagnosticTimeout: NodeJS.Timeout | undefined;
 /**
  * 문서 수정 이벤트 핸들러
  */
-export default function TextDocumentChangeEvent(event: vscode.TextDocumentChangeEvent, client: SkriptHubClient) {
+export default function TextDocumentChangeEvent(event: vscode.TextDocumentChangeEvent) {
     const document = event.document;
     if (document.languageId !== 'vskript') return;
 
@@ -42,7 +41,7 @@ export default function TextDocumentChangeEvent(event: vscode.TextDocumentChange
         SYMBOLS_MAP.delete(fsPath);
         
         // 3. 구문 오타 및 밸런싱 진단 엔진 풀가동
-        refreshDiagnostics(document, client);
+        refreshDiagnostics(document);
         
         diagnosticTimeout = undefined;
     }, 350);
