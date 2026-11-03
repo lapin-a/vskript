@@ -8,6 +8,7 @@ import TextDocumentChangeEvent from './Vskript/event/TextDocumentChangeEvent';
 import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
 import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics, setExtensionRootPath } from './Vskript/provider/SkriptDiagnostics';
 import { SkriptHubClient } from './Vskript/SkriptHubClient';
+import { ServerEnvironmentManager, onDidChangeEnvironment, getEnvironment } from './Vskript/env/ServerEnvironment';
 
 let hubClient: SkriptHubClient;
 
@@ -74,7 +75,25 @@ export async function activate(context: ExtensionContext) {
 
     console.log("--- vskript 확장 활성화 시작 ---");
     hubClient = new SkriptHubClient(context);
-    console.log("🌟 [로컬 모드 선언] 외부 서버 통신이 성공적으로 영구 차단되었습니다.");
+
+    // 서버 환경(Skript 버전/애드온) 감지 + 구문 DataPack 동기화.
+    // 네트워크를 쓰므로 활성화를 막지 않도록 기다리지 않는다.
+    const environment = new ServerEnvironmentManager(context);
+    context.subscriptions.push(
+        environment,
+        onDidChangeEnvironment(() => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) updateAllDiagnostics(editor.document);
+        }),
+        // plugins 폴더를 아직 못 찾았다면, 다른 .sk 파일을 열 때 다시 찾아본다
+        vscode.window.onDidChangeActiveTextEditor(editor => {
+            const env = getEnvironment();
+            if (editor && editor.document.uri.fsPath.endsWith('.sk') && env && !env.pluginsFolder) {
+                environment.scheduleRefresh();
+            }
+        }),
+    );
+    environment.refresh().catch(err => console.error('[vskript] 서버 환경 감지 실패:', err));
 
     languages.setLanguageConfiguration('vskript', {
         onEnterRules: [{

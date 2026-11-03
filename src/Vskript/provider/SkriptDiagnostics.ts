@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getEffectiveSkriptVersion } from '../env/ServerEnvironment';
 
 export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vskript");
 
@@ -117,30 +118,20 @@ export function refreshDiagnostics(document: vscode.TextDocument, hubClient: any
         const entries: vscode.Diagnostic[] = [];
         const lineCount = document.lineCount;
 
-        // 🌟 [버전 객체 트랩 분쇄]
+        // 버전 우선순위: 파일 상단 주석(# version: x.y) > 서버 환경(설정/plugins 감지) > 기본값 2.7
         let currentVersion = '2.7';
         const scriptTopVersion = parseScriptVersionFromText(document);
-        
+        const environmentVersion = getEffectiveSkriptVersion();
+
         if (scriptTopVersion) {
             currentVersion = scriptTopVersion;
-        } else if (hubClient) {
-            try {
-                const syncData = hubClient.getSyncData();
-                if (syncData && syncData.version) {
-                    const rawV = syncData.version;
-                    if (typeof rawV === 'object') {
-                        currentVersion = rawV.version || rawV.name || (rawV.major !== undefined ? `${rawV.major}.${rawV.minor || 0}` : '2.7');
-                    } else {
-                        currentVersion = String(rawV);
-                    }
-                }
-            } catch (e) {}
+        } else if (environmentVersion) {
+            currentVersion = environmentVersion;
         }
 
-        currentVersion = String(currentVersion).replace(/[^\d.]/g, '');
-        if (currentVersion === '' || currentVersion.includes('object')) {
-            currentVersion = '2.7';
-        }
+        // 숫자 부분만 사용 ("2.10.0-pre1" → "2.10.0"). 문자를 지우기만 하면 "2.10.01"처럼 틀어진다.
+        const numericVersion = String(currentVersion).match(/^\s*v?(\d+(?:\.\d+)*)/i);
+        currentVersion = numericVersion ? numericVersion[1] : '2.7';
 
         // 🌟 [핵심 수술 부위: 절대 경로 락 패치 완료]
         let syntaxPath = path.join(extensionRootPath, 'out', 'resource', 'core_syntax.json');

@@ -61,7 +61,10 @@
 				"vskript.language": {
 					"type": "string",
 					"default": "en",
-					"enum": ["en", "ko"],
+					"enum": [
+						"en",
+						"ko"
+					],
 					"enumDescriptions": [
 						"English descriptions will be shown by default.",
 						"한국어 설명서 및 가이드를 최우선으로 출력합니다."
@@ -69,17 +72,60 @@
 					"description": "vskript 인텔리센스(자동완성, 호버)에 표시될 가이드의 기본 언어를 설정합니다."
 				},
 				"vskript.hoverContentMode": {
-				"type": "string",
-				"default": "description",
-				"enum": ["description", "code"],
-				"enumDescriptions": [
-					"함수 상단 주석으로 작성된 가이드설명서(#>)를 우선 출력합니다.",
-					"함수의 실제 내부 소스 코드 본문(구현부)을 통째로 팝업에 출력합니다."
-				],
-				"description": "마우스를 올렸을 때(Hover) 표시할 함수의 콘텐츠 제공 형식을 선택합니다."
+					"type": "string",
+					"default": "description",
+					"enum": [
+						"description",
+						"code"
+					],
+					"enumDescriptions": [
+						"함수 상단 주석으로 작성된 가이드설명서(#>)를 우선 출력합니다.",
+						"함수의 실제 내부 소스 코드 본문(구현부)을 통째로 팝업에 출력합니다."
+					],
+					"description": "마우스를 올렸을 때(Hover) 표시할 함수의 콘텐츠 제공 형식을 선택합니다."
+				},
+				"vskript.serverPath": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "마인크래프트 서버 폴더(또는 `plugins` 폴더) 경로. 비워 두면 워크스페이스와 열린 `.sk` 파일의 상위 폴더에서 `plugins` 폴더를 자동으로 찾습니다. 상대 경로는 첫 번째 워크스페이스 폴더 기준입니다."
+				},
+				"vskript.skriptVersion": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "사용할 Skript 버전 (예: `2.10.0`). 비워 두면 `plugins` 폴더의 Skript jar에서 감지합니다. 값을 지정하면 감지 결과보다 우선하며, 감지 결과와 다르면 알림을 한 번 표시합니다. 파일 첫 줄의 `# version: x.y` 주석이 있으면 그 파일에서는 주석이 가장 우선합니다."
+				},
+				"vskript.addons": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "사용하는 Skript 애드온 목록. `이름` 또는 `이름@버전` 형식 (예: `SkBee@3.5.0`, `skript-reflect`). `plugins` 폴더에서 감지된 애드온에 추가되거나 버전을 덮어쓰며, 감지 결과와 다르면 알림을 한 번 표시합니다."
+				},
+				"vskript.database.autoDownload": {
+					"type": "boolean",
+					"default": true,
+					"description": "사용 중인 Skript/애드온의 구문 데이터(DataPack)를 vskript-database에서 자동으로 내려받습니다. 바뀐 애드온만 다시 받으며, 오프라인일 때는 저장된 데이터를 사용합니다."
+				},
+				"vskript.database.url": {
+					"type": "string",
+					"default": "https://raw.githubusercontent.com/lapin-a/vskript-database/main/datapacks/skripthub-net/",
+					"description": "구문 데이터(DataPack) 저장소 주소 (index.json이 있는 폴더)."
 				}
 			}
 		},
+		"commands": [
+			{
+				"command": "vskript.refreshEnvironment",
+				"title": "서버 환경 다시 감지 및 구문 데이터 동기화",
+				"category": "VSkript"
+			},
+			{
+				"command": "vskript.showEnvironment",
+				"title": "서버 환경 보기",
+				"category": "VSkript"
+			}
+		],
 		"configurationDefaults": {
 			"[vskript]": {
 				"editor.semanticHighlighting.enabled": true
@@ -92,7 +138,6 @@
 			}
 		]
 	},
-
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./ && npm run copy-resources",
@@ -116,8 +161,5 @@
 		"mocha": "^8.2.1",
 		"typescript": "^4.1.3",
 		"vscode-test": "^1.5.0"
-	},
-	"dependencies": {
-		"axios": "^1.16.1"
 	}
 }

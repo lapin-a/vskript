@@ -12,13 +12,15 @@
 
 ## 🔴 높음
 
-### H1. 런타임 의존성 `axios` 고위험 취약점
+### H1. 내려받은 DataPack을 자동완성/호버/진단에 연결
 
-- **현재 상태**: `npm audit --omit=dev` 결과 배포 패키지(vsix)에 포함되는 `axios`(1.0.0–1.19.0 범위)에 high 등급 취약점 존재. 게다가 `axios`를 쓰는 `syncWithServer()`/`syncAddonData()`는 호출되지 않는 죽은 코드임 (→ M1).
+- **현재 상태**: 서버 환경 감지와 DataPack 다운로드·캐시는 동작하지만(`src/Vskript/env/`), 받은 데이터는 아직 **Skript 버전 결정에만** 쓰임. 자동완성·호버·진단은 여전히 번들 `core_syntax.json`을 각자 따로 읽음 (진단·자동완성·SkriptHubClient 3곳).
 - **해야 할 일**:
-  - [ ] 원격 동기화를 안 쓴다면 `axios` 의존성 자체를 제거 (가장 확실)
-  - [ ] 쓸 계획이라면 `npm audit fix`로 패치 버전으로 업그레이드
-- **참고**: devDependencies(eslint, mocha, vscode-test 등 구버전)에도 취약점 다수 → L3
+  - [ ] `core_syntax.json`과 DataPack을 합친 단일 구문 저장소(레지스트리)를 만들고 세 곳이 그것만 보도록 정리
+  - [ ] 버전 필터: `valid_from_addon_version_parsed`로 현재 Skript/애드온 버전에서 유효한 구문만 제안
+  - [ ] 호버에 `guide.description`(한국어) 표시 (`vskript.language: ko`일 때)
+  - [ ] `onDidChangeEnvironment` 이벤트로 데이터 갱신 시 재로딩
+- **선행 조건**: vskript-database의 schema 2 DataPack이 GitHub에 push되어야 원격 다운로드가 동작함 (현재 원격은 schema 1 → 확장이 "지원하지 않는 형식"으로 거부하고 캐시/번들 데이터로 동작)
 
 ### H2. 전역 `console.log` 가로채기
 
@@ -45,13 +47,12 @@
   - [ ] 구문 진단과 버전 진단을 각각 배열로 계산한 뒤 한 번만 `set` 하도록 변경
   - [ ] 문서별 디바운스 적용
 
-### M2. 버전 호환성 진단 데이터 소스 명확화 (README 불일치)
+### M2. 버전 호환성 진단 실제 동작 (README 불일치)
 
-- **현재 상태**: README는 "Skript Hub 동기화 데이터 기반"이라고 설명하지만, 실제로는 `core_syntax.json`(로컬 번들 데이터)만 사용. `syncWithServer()`, `syncAddonData()`는 어디서도 호출되지 않음.
+- **현재 상태**: README는 "버전 호환성을 진단"한다고 설명하지만, `SkriptDiagnostics.ts`의 버전별 구문 검사는 `enableSyntaxCheck = false`로 꺼져 있고 `checkVersionCompatibility()`는 빈 배열만 반환. 버전 결정(파일 주석 > 서버 환경 > 기본 2.7)은 이제 동작함.
 - **해야 할 일**:
-  - [ ] README 설명을 "**내장된 로컬 구문 데이터베이스 기반**"으로 정정
-  - [ ] 원격 동기화를 쓸 계획이라면 `activate()` 또는 별도 명령(Command)에 `syncWithServer()` 호출부 연결
-  - [ ] 쓰지 않을 계획이라면 죽은 코드(`syncWithServer`, `syncAddonData`, `API_URL`) 제거 (→ H1과 함께 처리)
+  - [ ] H1(DataPack 연결) 후 버전 검사 활성화
+  - [ ] 그 전까지 README 설명을 실제 동작에 맞게 정정
 
 ### M3. 스니펫 동작 확인
 
@@ -89,6 +90,14 @@
 ---
 
 ## 완료된 항목
+
+- [x] **서버 환경 감지 + DataPack 다운로드** (2026-11-03): `src/Vskript/env/`
+  - `plugins` 폴더 자동 탐색(`vskript.serverPath`로 지정 가능) → jar 안의 `plugin.yml`/`paper-plugin.yml`에서 이름·버전 읽기 (실패 시 파일명 추정)
+  - 설정 `vskript.skriptVersion`, `vskript.addons`(`이름@버전`)가 감지 결과를 덮어씀. 감지값과 다르면 **같은 불일치당 알림 1회** (내용이 바뀌면 다시 알림, 명령 실행 시 항상 알림)
+  - vskript-database DataPack을 `content_hash` 비교로 바뀐 애드온만 내려받고 해시 검증 후 `globalStorageUri`에 캐시. 오프라인이면 캐시 사용
+  - 상태 표시줄(Skript 버전·애드온 수·불일치 표시), 명령 `VSkript: 서버 환경 보기` / `서버 환경 다시 감지 및 구문 데이터 동기화`, jar 변경·설정 변경 시 자동 재감지
+  - 진단의 Skript 버전 = 파일 주석 > 서버 환경 > 기본 2.7 (기존: 주석 > 2.7)
+- [x] **`axios` 제거** (2026-11-03): 호출되지 않던 `syncWithServer`/`syncAddonData`와 함께 삭제. 다운로드는 내장 `fetch` 사용. 런타임 의존성 취약점 0건
 
 - [x] **빌드 깨짐 수정**: 커밋 `a7c4ff1`에서 `SkriptCompletionItemProvider.ts`가 `SkriptDocumentSymbolProvider`와 거의 동일한 코드로 덮어써져 `tsc` 컴파일이 실패하던 문제 → 직전 버전으로 복원 (동작 검증은 H3)
 - [x] **VS Code 버전 불일치 수정**: 기준을 1.120.0으로 통일 (`engines.vscode`는 `^1.120.0`, `@types/vscode`는 `~1.120.0`으로 고정 — `^`로 두면 1.144가 설치되어 vsce가 패키징을 거부함). VS Code 1.120 미만은 더 이상 지원하지 않음.

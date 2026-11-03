@@ -186,6 +186,13 @@ Diagnoses the version compatibility of used syntax based on Skript Hub sync data
 | --- | --- | --- | --- |
 | `vskript.language` | `string` (`en` \| `ko`) | `en` | 인텔리센스(자동완성, 호버)에 표시될 가이드의 기본 언어를 설정합니다. |
 | `vskript.hoverContentMode` | `string` (`description` \| `code`) | `description` | 호버 시 표시할 콘텐츠 형식을 선택합니다. `description`은 함수 상단 Docs 주석을, `code`는 함수의 실제 소스 코드를 표시합니다. |
+| `vskript.serverPath` | `string` | `""` | 서버 폴더(또는 `plugins` 폴더) 경로. 비우면 워크스페이스/열린 `.sk` 파일의 상위 폴더에서 자동으로 찾습니다. |
+| `vskript.skriptVersion` | `string` | `""` | Skript 버전. 비우면 `plugins` 폴더에서 감지합니다. 감지 결과와 다르면 알림을 한 번 표시하고 설정값을 우선합니다. |
+| `vskript.addons` | `string[]` | `[]` | 사용 애드온 (`이름` 또는 `이름@버전`, 예: `SkBee@3.5.0`). 감지 결과에 추가하거나 버전을 덮어씁니다. |
+| `vskript.database.autoDownload` | `boolean` | `true` | 사용 중인 Skript/애드온의 구문 데이터를 vskript-database에서 자동으로 내려받습니다 (바뀐 것만, 오프라인 시 캐시 사용). |
+| `vskript.database.url` | `string` | GitHub raw 주소 | 구문 데이터 저장소 주소. |
+
+서버 환경은 상태 표시줄에 표시되며, 클릭하거나 명령 팔레트의 `VSkript: 서버 환경 보기`로 감지 결과를 확인할 수 있습니다.
 
 ### Settings
 
@@ -193,6 +200,13 @@ Diagnoses the version compatibility of used syntax based on Skript Hub sync data
 | --- | --- | --- | --- |
 | `vskript.language` | `string` (`en` \| `ko`) | `en` | Sets the default language for the guide shown in IntelliSense (auto-completion, hover). |
 | `vskript.hoverContentMode` | `string` (`description` \| `code`) | `description` | Selects the content format shown on hover. `description` shows the function's Docs comment; `code` shows the function's actual source code. |
+| `vskript.serverPath` | `string` | `""` | Server folder (or `plugins` folder). If empty, searched automatically upward from the workspace / open `.sk` file. |
+| `vskript.skriptVersion` | `string` | `""` | Skript version. If empty, detected from the `plugins` folder. If it differs from detection, a one-time notice is shown and the setting wins. |
+| `vskript.addons` | `string[]` | `[]` | Addons in use (`name` or `name@version`, e.g. `SkBee@3.5.0`). Added to / overrides detected addons. |
+| `vskript.database.autoDownload` | `boolean` | `true` | Automatically downloads syntax data for your Skript/addons from vskript-database (only changed packs; cached for offline use). |
+| `vskript.database.url` | `string` | GitHub raw URL | Syntax data repository URL. |
+
+The detected server environment is shown in the status bar; click it or run `VSkript: 서버 환경 보기` (Show Server Environment) from the command palette for details.
 
 <br>
 
