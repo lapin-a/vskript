@@ -2,8 +2,8 @@
 
 # VSkript
 
-![version](https://img.shields.io/badge/version-0.1.0-blue.svg)
-![vscode](https://img.shields.io/badge/VSCode-%5E1.56.0-brightgreen.svg)
+![version](https://img.shields.io/badge/version-0.1.1-blue.svg)
+![vscode](https://img.shields.io/badge/VSCode-%5E1.120.0-brightgreen.svg)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 
 Minecraft(Java Edition)의 Skript 플러그인 스크립트(.sk)를 위한 VSCode 확장 프로그램입니다.
@@ -38,10 +38,12 @@ A VSCode extension for writing Minecraft(Java Edition) Skript plugin scripts (.s
 ## 소개
 
 VSkript는 Skript 스크립트의 함수를 보다 편리하게 작성하고 관리할 수 있도록 도와주는 VSCode 확장 프로그램입니다.
-구문 강조, 컬러 미리보기, 아웃라인, 툴팁, 자동완성, 심볼 검색, 정의로 이동, 버전 호환성 진단 등의 기능을 제공합니다.
+구문 강조, 컬러 미리보기, 아웃라인, 툴팁, 자동완성, 심볼 검색, 정의로 이동, 기본 진단 기능을 제공합니다.
+서버의 Skript·애드온 버전을 감지해 그 버전에서 쓸 수 있는 구문만 제안하고, 구문 설명을 한국어로 볼 수 있습니다.
 
 VSkript is a VSCode extension designed to make writing and managing Skript functions more convenient.
-It provides syntax highlighting, a color preview, an outline view, tooltips, auto-completion, symbol search, go-to-definition, and version compatibility diagnostics.
+It provides syntax highlighting, a color preview, an outline view, tooltips, auto-completion, symbol search, go-to-definition, and basic diagnostics.
+It detects your server's Skript and addon versions, suggests only the syntax available in them, and can show syntax descriptions in Korean.
 
 <br>
 
@@ -171,12 +173,47 @@ Use the `Ctrl+Space` shortcut to bring up the function auto-completion list.
 **Go to Definition**
 `Ctrl+Click`, or pressing `F12` while the cursor is on a function, navigates to where the function is defined.
 
-### 6. 버전 호환성 진단
+### 6. 구문 자동완성 / 호버
 
-Skript Hub 동기화 데이터를 기반으로 사용 중인 문법의 버전 호환성을 진단합니다.
+- 자동완성: Skript와 설치된 애드온의 구문 중 **현재 버전에서 쓸 수 있는 것만** 제안합니다.
+- 호버: 구문 위에 마우스를 올리면 설명, 패턴, 지원 버전을 보여 줍니다. 현재 버전에서 쓸 수 없는 구문이면 경고를 함께 표시합니다.
+- `vskript.language`를 `ko`로 설정하면 한국어 설명을 보여 줍니다 (번역이 없는 구문은 영어 원문).
+- Skript 버전은 파일 상단 10줄 안의 주석이 우선하고, 없으면 서버 환경에서 감지한 버전을 씁니다.
 
-**Version Compatibility Diagnostics**
-Diagnoses the version compatibility of used syntax based on Skript Hub sync data.
+```vskript
+# version: 2.10
+# mc: 1.20      (마인크래프트 버전으로 지정할 수도 있음)
+```
+
+**Syntax Completion / Hover**
+- Completion suggests Skript and installed-addon syntax **available in your current versions** only.
+- Hovering over a statement shows its description, patterns and supported version, with a warning if it is not available in your version.
+- Set `vskript.language` to `ko` to see Korean descriptions (English is shown where no translation exists).
+- The Skript version comes from a header comment in the first 10 lines (`# version: 2.10` or `# mc: 1.20`), otherwise from the detected server environment.
+
+### 7. 진단
+
+- 이벤트, 명령어, 함수, `options` 줄 끝의 콜론(`:`) 누락
+- 들여쓰기 탭·공백 혼용, 섹션 아래 들여쓰기 깊이
+
+> 구문별 버전 호환성 검사는 아직 꺼져 있습니다 (오탐 검증 중).
+
+**Diagnostics**
+- Missing colon (`:`) at the end of event, command, function and `options` lines
+- Mixed tabs/spaces and indentation depth under a section
+
+> Per-syntax version compatibility checks are not enabled yet (false positives are being evaluated).
+
+### 8. 서버 환경 감지와 구문 데이터
+
+- 작업 공간이나 열린 `.sk` 파일에서 위로 올라가며 `plugins` 폴더를 찾고, jar 안의 `plugin.yml`에서 Skript와 애드온 버전을 읽습니다. 찾지 못하면 `vskript.serverPath`로 지정할 수 있습니다.
+- 감지 결과에 맞는 구문 데이터를 [vskript-database](https://github.com/lapin-a/vskript-database)에서 내려받습니다. 바뀐 것만 받고, 오프라인이면 캐시를 씁니다.
+- 상태 표시줄에 Skript 버전과 애드온 수가 표시됩니다. 명령 팔레트에서 `VSkript: 서버 환경 보기`, `VSkript: 서버 환경 다시 감지 및 구문 데이터 동기화`를 쓸 수 있습니다.
+
+**Server Environment and Syntax Data**
+- Searches upward from the workspace or the open `.sk` file for a `plugins` folder and reads Skript/addon versions from `plugin.yml` inside each jar. Use `vskript.serverPath` if it is not found.
+- Downloads the matching syntax data from [vskript-database](https://github.com/lapin-a/vskript-database), only when it has changed; the cache is used when offline.
+- The status bar shows the Skript version and addon count. Commands: `VSkript: 서버 환경 보기` (Show Server Environment) and `VSkript: 서버 환경 다시 감지 및 구문 데이터 동기화` (Re-detect and sync syntax data).
 
 <br>
 
@@ -212,33 +249,29 @@ The detected server environment is shown in the status bar; click it or run `VSk
 
 ## 개발 / 빌드
 
-# 의존성 설치
-npm install
+Node.js 22.13 이상이 필요합니다 (eslint 10, @vscode/test-cli 기준).
 
-# 컴파일
-npm run compile
-
-# 변경 감지 컴파일
-npm run watch
-
-# 린트 검사
-npm run lint
-
+```bash
+npm install          # 의존성 설치
+npm run compile      # 컴파일 (리소스 복사 포함)
+npm run watch        # 변경 감지 컴파일
+npm run lint         # 린트 검사
+npm run test:unit    # 단위 테스트 (VS Code 없이 실행)
+npm test             # 컴파일 + 린트 + VS Code 1.120 통합 테스트 (처음 실행 시 VS Code를 내려받음)
+```
 
 ### Development / Build
 
-# Install dependencies
-npm install
+Requires Node.js 22.13 or later (for eslint 10 and @vscode/test-cli).
 
-# Compile
-npm run compile
-
-# Compile in watch mode
-npm run watch
-
-# Lint
-npm run lint
-
+```bash
+npm install          # Install dependencies
+npm run compile      # Compile (also copies resources)
+npm run watch        # Compile in watch mode
+npm run lint         # Lint
+npm run test:unit    # Unit tests (no VS Code needed)
+npm test             # Compile + lint + integration tests on VS Code 1.120 (downloads VS Code on first run)
+```
 
 <br>
 
