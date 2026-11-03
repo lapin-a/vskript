@@ -115,7 +115,9 @@ export class ServerEnvironmentManager implements vscode.Disposable {
     private watchedFolder: string | null = null;
     private refreshTimer: NodeJS.Timeout | undefined;
     private running: Promise<void> | null = null;
-    private rerunRequested = false;
+    /** 감지 중에 들어온 재감지 요청 (진행 중인 감지가 끝나면 실행) */
+    private rerun: Promise<void> | null = null;
+    private rerunUserInitiated = false;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         this.output = initLogger(context); // 확장 전체가 쓰는 'VSkript' 로그 채널 (해제는 로거가 담당)
@@ -147,17 +149,28 @@ export class ServerEnvironmentManager implements vscode.Disposable {
         this.refreshTimer = setTimeout(() => this.refresh(), 1000);
     }
 
-    async refresh(opts: { userInitiated?: boolean } = {}): Promise<void> {
+    /**
+     * 환경을 다시 감지한다. 반환된 Promise는 "호출 시점의 설정이 반영된" 감지가 끝나면 완료된다.
+     * 이미 감지 중이면 그 감지는 호출 전 설정으로 시작됐을 수 있으므로, 끝나는 즉시 한 번 더 감지하고
+     * 그 재감지가 끝날 때 완료한다. (감지 중 여러 번 호출돼도 재감지는 한 번만)
+     */
+    refresh(opts: { userInitiated?: boolean } = {}): Promise<void> {
         if (this.running) {
-            this.rerunRequested = true;
-            return this.running;
+            this.rerunUserInitiated ||= opts.userInitiated === true;
+            if (!this.rerun) {
+                // 진행 중인 감지가 실패해도 재감지는 한다
+                this.rerun = this.running.catch(() => undefined).then(() => {
+                    this.rerun = null;
+                    const userInitiated = this.rerunUserInitiated;
+                    this.rerunUserInitiated = false;
+                    return this.refresh({ userInitiated });
+                });
+            }
+            return this.rerun;
         }
+        // finally가 먼저 실행되므로, 위의 then 시점에는 running이 이미 null이다
         this.running = this.doRefresh(opts).finally(() => {
             this.running = null;
-            if (this.rerunRequested) {
-                this.rerunRequested = false;
-                this.scheduleRefresh();
-            }
         });
         return this.running;
     }
