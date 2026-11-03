@@ -4,3 +4,4 @@ out/**
 *.log
 *.tmp
 .env
+.vscode-test/

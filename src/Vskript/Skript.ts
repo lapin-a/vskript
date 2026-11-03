@@ -16,7 +16,7 @@ export async function onSkriptEnable() {
 		for (const path of WORKSPACE_FOLDERS) {
 			let rootPath = new SkriptPath(path.uri.fsPath, '');
 			for (let skPath of await _getSkriptPaths(rootPath)) {
-				let document = FileSystem.readFileSync(skPath.fsPath, {encoding: 'UTF-8'});
+				let document = FileSystem.readFileSync(skPath.fsPath, {encoding: 'utf-8'});
 				let skDocument = new SkriptDocument(skPath, document);
 				DOCUMENTS.push(skDocument);
 				
@@ -42,7 +42,7 @@ export function scanSingleFile(uri: vscode.Uri): SkriptDocument {
 	let name = Path.relative(root, fsPath);
 	
 	let skPath = new SkriptPath(root, name);
-	let documentContent = FileSystem.readFileSync(fsPath, {encoding: 'UTF-8'});
+	let documentContent = FileSystem.readFileSync(fsPath, {encoding: 'utf-8'});
 	let skDocument = new SkriptDocument(skPath, documentContent);
 	
 	DOCUMENTS.push(skDocument);
@@ -70,7 +70,7 @@ export function find(fsPath:string): SkriptDocument | undefined {
 /** 하위경로 받아오기 */
 async function _getSkriptPaths(loopPath: SkriptPath): Promise<SkriptPath[]> {
 	let skPathArray = new Array<SkriptPath>();
-	for (const file of FileSystem.readdirSync(loopPath.fsPath, {encoding:'UTF-8', withFileTypes:true})) {
+	for (const file of FileSystem.readdirSync(loopPath.fsPath, {encoding:'utf-8', withFileTypes:true})) {
 		let skPath = new SkriptPath(loopPath.root, Path.join(loopPath.name, file.name));
 		if (file.name.charAt(0) === '-') {
 			continue;
