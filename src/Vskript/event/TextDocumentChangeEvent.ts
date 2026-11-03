@@ -80,27 +80,33 @@ function inputEnter(context: vscode.TextDocumentContentChangeEvent, document: vs
         const prefix = groups.prefix;
             
         if (prefix === '#>>') {
-            editor.edit(builder => { 
-                builder.delete(new vscode.Range(document.lineAt(i).range.start, document.lineAt(i+1).range.end));
-            });
-
+            // 아래 함수는 편집 전 문서 모델(350ms 디바운스 전)에서 찾는다
             const skDocument = Skript.find(document.uri.fsPath);
-            if (!skDocument) {return;}
-
-            const skFunction = skDocument.componentOf(context.range.start, {isAfter:true});
-            if (!skFunction || !(skFunction instanceof SkriptFunction)) {return;}
+            const skFunction = skDocument?.componentOf(context.range.start, {isAfter:true});
 
             const docs = new Array<string>();
-            let j = 1;
-            if (skFunction.parameters) {
-                for (const param of skFunction.parameters) {
-                    docs.push(`#> @param ${param.name} \${${j++}}`);
+            if (skFunction instanceof SkriptFunction) {
+                let j = 1;
+                if (skFunction.parameters) {
+                    for (const param of skFunction.parameters) {
+                        docs.push(`${groups.space}#> @param ${param.name} \${${j++}}`);
+                    }
                 }
+                if (skFunction.returnType) {docs.push(`${groups.space}#> @return \${${j++}}`);}
+                docs.unshift(`${groups.space}#> \${${j}}`);
             }
-            if (skFunction.returnType) {docs.push(`#> @return \${${j++}}`);}
-            docs.unshift(`#> \${${j}}`);
-            
-            editor.insertSnippet(new vscode.SnippetString(docs.join('\r\n')), context.range);
+
+            // "#>>"와 Enter로 생긴 줄을 지운 "뒤에" 그 자리에 스니펫을 넣는다.
+            // 두 편집을 기다리지 않고 연달아 보내면 두 번째(스니펫)가 이전 문서 버전 기준이라 거부되어
+            // "#>>"만 지워지고 Docs가 생기지 않았다.
+            void (async () => {
+                const deleted = await editor.edit(builder => {
+                    builder.delete(new vscode.Range(document.lineAt(i).range.start, document.lineAt(i+1).range.end));
+                });
+                if (deleted && docs.length > 0) {
+                    await editor.insertSnippet(new vscode.SnippetString(docs.join('\n')), new vscode.Position(i, 0));
+                }
+            })();
 
         } else if (prefix === '#>') {
             editor.edit(builder => {

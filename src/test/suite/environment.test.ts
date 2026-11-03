@@ -2,68 +2,13 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import * as zlib from 'zlib';
 import * as vscode from 'vscode';
 import { DEFAULT_DATABASE_URL } from '../../Vskript/env/DataPackClient';
+import { removeTempDir, writeJar } from '../helpers';
 
 // 실제 사용 흐름 검증 (TODO H3):
 //   서버 폴더(plugins/Skript.jar) 감지 → GitHub에서 DataPack 다운로드 → 감지 버전으로 자동완성 필터 → 한국어 호버
 // 네트워크가 없으면 건너뛴다.
-
-const CRC_TABLE = (() => {
-    const t = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-        let c = n;
-        for (let k = 0; k < 8; k++) {c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;}
-        t[n] = c >>> 0;
-    }
-    return t;
-})();
-
-function crc32(buf: Buffer): number {
-    let c = 0xffffffff;
-    for (const b of buf) {c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);}
-    return (c ^ 0xffffffff) >>> 0;
-}
-
-/** 항목 하나(deflate)짜리 zip(jar)을 만든다 */
-function writeJar(file: string, entryName: string, content: string) {
-    const name = Buffer.from(entryName, 'utf8');
-    const raw = Buffer.from(content, 'utf8');
-    const data = zlib.deflateRawSync(raw);
-    const crc = crc32(raw);
-
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(8, 8); // deflate
-    local.writeUInt32LE(crc, 14);
-    local.writeUInt32LE(data.length, 18);
-    local.writeUInt32LE(raw.length, 22);
-    local.writeUInt16LE(name.length, 26);
-
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(8, 10);
-    central.writeUInt32LE(crc, 16);
-    central.writeUInt32LE(data.length, 20);
-    central.writeUInt32LE(raw.length, 24);
-    central.writeUInt16LE(name.length, 28);
-    central.writeUInt32LE(0, 42); // local header offset
-
-    const cdOffset = local.length + name.length + data.length;
-    const cdSize = central.length + name.length;
-    const eocd = Buffer.alloc(22);
-    eocd.writeUInt32LE(0x06054b50, 0);
-    eocd.writeUInt16LE(1, 8);
-    eocd.writeUInt16LE(1, 10);
-    eocd.writeUInt32LE(cdSize, 12);
-    eocd.writeUInt32LE(cdOffset, 16);
-
-    fs.writeFileSync(file, Buffer.concat([local, name, data, central, name, eocd]));
-}
 
 async function online(): Promise<boolean> {
     try {
@@ -110,7 +55,7 @@ suite('실제 사용 흐름: 서버 폴더 → DataPack → 한국어 호버', f
         for (const k of keys) {
             if (saved.has(k)) {await config().update(k, saved.get(k), vscode.ConfigurationTarget.Global);}
         }
-        if (serverDir) {try { fs.rmSync(serverDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* 임시 폴더 */ }}
+        if (serverDir) {removeTempDir(serverDir);}
     });
 
     test('plugins 폴더에서 감지한 Skript 버전으로 자동완성을 거른다', async () => {

@@ -31,6 +31,12 @@
 	- Function parameter types were shown as `[object Object]` in the outline
 	- Running "re-detect" during a syntax data sync did not apply changed settings right away
 	- The extension altered other extensions' logs (`console.log`); logs now go to the `VSkript` channel in the Output panel
+	- The outline did not show aliases, option keys, command options or local variables (document parsing bug introduced in v0.1.0)
+	- Semantic highlighting (alias usage, function parameters) did not work (same cause)
+	- Function Docs comments (`#>`) were not shown on hover
+	- `#>>` + Enter did not generate Docs comments
+	- The function body hover (`code` mode) included the next function's comments
+	- Outline and hover did not work for `.sk` files on a different drive than the workspace
 
 # Update v0.1.0
 1. Diagnostics

@@ -3,17 +3,9 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { removeTempDir } from '../helpers';
 
 const EXTENSION_ID = 'Vhone.vskript';
-
-/** 임시 폴더 삭제 (Windows에서 파일 감시 등으로 잠겨 있으면 재시도 후 무시) */
-function removeTempDir(dir: string) {
-    try {
-        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    } catch {
-        // 임시 폴더이므로 남아도 무방
-    }
-}
 
 async function openSkript(content: string): Promise<vscode.TextDocument> {
     const doc = await vscode.workspace.openTextDocument({ language: 'vskript', content });
@@ -141,16 +133,19 @@ suite('VSkript 확장', () => {
                 assert.ok(snippetLabels.includes(prefix), `스니펫 ${prefix} 없음: ${JSON.stringify(snippetLabels.slice(0, 30))}`);
             }
 
-            const expand = async (name: string) => {
+            // 자동완성 항목이 가진 스니펫 본문을 편집 API로 펼친다
+            // ('editor.action.insertSnippet' 명령은 창이 OS 포커스를 가질 때만 동작해 테스트가 간헐적으로 실패했다)
+            const expand = async (prefix: string) => {
+                const item = list.items.find(i => i.kind === vscode.CompletionItemKind.Snippet && (typeof i.label === 'string' ? i.label : i.label.label) === prefix)!;
+                const body = item.insertText instanceof vscode.SnippetString ? item.insertText.value : String(item.insertText);
                 await editor.edit(b => b.delete(new vscode.Range(0, 0, doc.lineCount, 0)));
-                editor.selection = new vscode.Selection(0, 0, 0, 0);
-                await vscode.commands.executeCommand('editor.action.insertSnippet', { langId: 'vskript', name });
+                assert.ok(await editor.insertSnippet(new vscode.SnippetString(body), new vscode.Position(0, 0)), `${prefix} 삽입 실패`);
                 // 들여쓰기는 사용자 편집기 설정(탭/공백)을 따르므로 탭으로 맞춰 비교
                 return doc.getText().replace(/\r\n/g, '\n').replace(/^(?: {4}|\t)/gm, '\t').trimEnd();
             };
-            assert.strictEqual(await expand('Function Void'), 'function myscript_Name():');
-            assert.strictEqual(await expand('Function Return'), 'function myscript_Name() :: return_type:\n\t# code\n\treturn {_return_type}');
-            assert.strictEqual(await expand('Function Void Inner'), 'function fxmyscriptName():');
+            assert.strictEqual(await expand('_func'), 'function myscript_Name():');
+            assert.strictEqual(await expand('_funcr'), 'function myscript_Name() :: return_type:\n\t# code\n\treturn {_return_type}');
+            assert.strictEqual(await expand('_fx'), 'function fxmyscriptName():');
         } finally {
             await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
             removeTempDir(dir);
