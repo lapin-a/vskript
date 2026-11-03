@@ -1,7 +1,9 @@
 import { Position, Range } from "vscode";
 import { SkriptComponent, SkriptToolTip } from "./SkriptComponent";
 import * as Path from 'path';
-import { Class } from "../Java";
+
+/** 생성자 타입 (getComponents의 클래스 인자용) */
+type Class<T> = { new (...args: any[]): T };
 
 export class SkriptPath {
 	public readonly fsPath: string;
