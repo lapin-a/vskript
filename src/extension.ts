@@ -9,6 +9,7 @@ import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider'
 import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
 import { initSyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
 import { ServerEnvironmentManager, getEnvironment } from './Vskript/env/ServerEnvironment';
+import { initLogger, log } from './Vskript/Logger';
 
 /**
  * [최적화] 진단 연산을 비동기로 격리하여 메인 UI 스레드 프리징을 원천 차단합니다.
@@ -35,40 +36,14 @@ export function updateAllDiagnostics(document: vscode.TextDocument) {
             }
             skriptDiagnostics.set(document.uri, finalDiagnostics);
         } catch (error) {
-            console.error("🚨 [extension.ts] updateAllDiagnostics 에러 방어:", error);
+            log.error('진단 갱신 실패:', error);
         }
     }, 5); // 5ms의 미세 지연을 주어 에디터 화면 렌더링 및 포커스가 먼저 완료되도록 유도
 }
 
 export async function activate(context: ExtensionContext) {
-    // 🌟 [런타임 로그 선점 하이재킹] 
-    const originalLog = console.log;
-    const originalInfo = console.info;
-
-    const logInterceptor = function(originalFn: any, ...args: any[]) {
-        const fullLogMessage = args.map(a => String(a)).join(' ');
-        
-        if (fullLogMessage.includes('[즉시 스캔 완료]') || fullLogMessage.includes('[데이터 업데이트]') || fullLogMessage.includes('초고속 최적화 성공')) {
-            const fileMatch = fullLogMessage.match(/([^\\\/]+\.sk)/i);
-            if (fileMatch && fileMatch[1]) {
-                const fileName = fileMatch[1].trim();
-                if (fileName.startsWith('-')) {return;} 
-                
-                if (fullLogMessage.includes('[즉시 스캔 완료]')) {
-                    originalFn(`[즉시 스캔 완료] ${fileName}`);
-                } else {
-                    originalFn(`[데이터 업데이트] 초고속 최적화 성공: ${fileName}`);
-                }
-                return;
-            }
-        }
-        originalFn(...args);
-    };
-
-    console.log = (...args: any[]) => logInterceptor(originalLog, ...args);
-    console.info = (...args: any[]) => logInterceptor(originalInfo, ...args);
-
-    console.log("--- vskript 확장 활성화 시작 ---");
+    initLogger(context);
+    log.info('VSkript 활성화 시작');
     // 구문 저장소(번들 core + DataPack). 서버 환경이 바뀌면 스스로 다시 읽는다.
     const syntaxRegistry = initSyntaxRegistry(context);
 
@@ -90,7 +65,7 @@ export async function activate(context: ExtensionContext) {
             }
         }),
     );
-    environment.refresh().catch(err => console.error('[vskript] 서버 환경 감지 실패:', err));
+    environment.refresh().catch(err => log.error('서버 환경 감지 실패:', err));
 
     languages.setLanguageConfiguration('vskript', {
         onEnterRules: [{
@@ -120,16 +95,16 @@ export async function activate(context: ExtensionContext) {
                             Skript.scanSingleFile(targetUri);
                         }
                     });
-                    console.log(`📂 [vskript 디렉토리 스캔] 현재 폴더의 모든 형제 .sk 파일 인덱싱 동기화 완료!`);
+                    log.debug(`현재 폴더의 .sk 파일 스캔 완료: ${currentFolderPath}`);
                 }
             } catch (err) {
-                console.error("🚨 주변 파일 자동 스캔 중 실패:", err);
+                log.error('현재 폴더 스캔 실패:', err);
             }
         }
         updateAllDiagnostics(activeEditor.document);
     }
 
-    console.log("--- 초기 스캔 완료 ---");
+    log.info('초기 스캔 완료');
 
     context.subscriptions.push(
         workspace.onDidOpenTextDocument(async (document) => {

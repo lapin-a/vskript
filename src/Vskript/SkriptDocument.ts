@@ -1,6 +1,7 @@
 import { Position, Range } from "vscode";
 import { SkriptComponent, SkriptToolTip } from "./SkriptComponent";
 import * as Path from 'path';
+import { log } from './Logger';
 
 /** 생성자 타입 (getComponents의 클래스 인자용) */
 type Class<T> = { new (...args: any[]): T };
@@ -136,7 +137,7 @@ export class SkriptDocument {
 
 		if (match) {
 			this._version = match[1];
-			console.log(`[버전 감지 성공] 파일 기준 버전: v${this._version}`);
+			log.debug(`파일 주석 버전: v${this._version}`);
 		} else {
 			// 파일 내 설정이 없으면 undefined (이후 기본 설정값 사용)
 			this._version = undefined;

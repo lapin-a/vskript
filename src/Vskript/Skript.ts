@@ -3,6 +3,7 @@ import * as FileSystem from 'fs';
 import * as Path from 'path';
 import * as vscode from 'vscode'; // Uri 타입을 위해 vscode 임포트 추가
 import { SkriptDocument, SkriptPath } from './SkriptDocument';
+import { log } from './Logger';
 
 // [오타 교정] WORKSAPCE_FATH -> WORKSPACE_FOLDERS
 const WORKSPACE_FOLDERS = workspace.workspaceFolders;
@@ -20,7 +21,7 @@ export async function onSkriptEnable() {
 				let skDocument = new SkriptDocument(skPath, document);
 				DOCUMENTS.push(skDocument);
 				
-				console.log(`[즉시 스캔 완료] ${Path.basename(skPath.fsPath)}`);
+				log.debug(`스캔: ${Path.basename(skPath.fsPath)}`);
 			};
 		}
 		window.showInformationMessage(`Loaded ${DOCUMENTS.length} skript files.`);
@@ -46,7 +47,7 @@ export function scanSingleFile(uri: vscode.Uri): SkriptDocument {
 	let skDocument = new SkriptDocument(skPath, documentContent);
 	
 	DOCUMENTS.push(skDocument);
-	console.log(`[즉시 스캔 완료] ${Path.basename(fsPath)}`);
+	log.debug(`스캔: ${Path.basename(fsPath)}`);
 	
 	return skDocument;
 }

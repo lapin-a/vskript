@@ -12,13 +12,6 @@
 
 ## 🔴 높음
 
-### H2. 전역 `console.log` 가로채기
-
-- **현재 상태**: `extension.ts`의 `activate()`에서 `console.log`/`console.info`를 전역으로 덮어씀. 같은 확장 호스트에서 돌아가는 **다른 확장의 로그까지 변형·누락**될 수 있으며, `deactivate()`에서 복원하지 않음.
-- **해야 할 일**:
-  - [ ] `vscode.window.createOutputChannel('VSkript')` 기반 전용 로거로 교체하고 전역 패치 제거
-  - [ ] 미사용 `src/Vskript/patchLogger.ts`도 함께 삭제 (같은 방식의 패치 코드)
-
 ### H3. 자동완성/호버 실제 사용 환경 검증
 
 - **현재 상태**: 통합 테스트(VS Code 1.120, `npm test`)로 활성화·명령 등록·구문 자동완성(버전별 제안 수 차이)·`{@` 옵션 완성·구문 호버는 자동 확인됨. 단 테스트는 저장되지 않은 문서 기준이며, **실제 서버 폴더 + 내려받은 DataPack + 한국어 번역 호버**는 미확인.
@@ -61,6 +54,7 @@
 
 ## 완료된 항목
 
+- [x] **H2. 전역 `console.log` 가로채기 제거** (2026-11-03): `activate()`의 전역 `console.log`/`console.info` 덮어쓰기와 미사용 `patchLogger.ts` 삭제. 새 `src/Vskript/Logger.ts`가 출력 패널의 "VSkript" 로그 채널(`LogOutputChannel`) 하나에 기록하며 `ServerEnvironment`도 같은 채널을 씀(같은 이름의 채널이 두 개 생기던 문제 해소). 타이핑·스캔마다 찍히던 기록은 debug 수준으로 내림(출력 패널에서 수준 변경 가능). 재발 방지: eslint `no-restricted-syntax`로 `console.* =` 대입을 **오류** 처리 → `npm test`(린트 포함)에서 실패. 런타임 테스트는 테스트 실행기가 console을 계속 다시 감싸서 함수 비교가 불가능해 쓰지 않음
 - [x] **L3. 개발 도구 의존성 업그레이드** (2026-11-03): typescript 4 → 6.0(typescript-eslint가 `<6.1`까지 지원해 7.x는 보류), eslint 7 → 10 + typescript-eslint 8(`.eslintrc.json` → `eslint.config.mjs`), `vscode-test` → `@vscode/test-cli` + `@vscode/test-electron`, mocha 8 → 11, `@types/node` 12 → 22, `copyfiles` → `fs.cpSync`, 미사용 `glob`/`@types/glob` 제거. 런타임 의존성 취약점 0건. 남은 `npm audit` 17건은 전부 테스트 도구(mocha, @vscode/test-cli) 하위 의존성이며 상위 수정판 없음
 - [x] **L2. 테스트 / 린트** (2026-11-03): `npm test` = 컴파일 → 린트 → VS Code 1.120 통합 테스트(단위 5 + 통합 4). VS Code 없이 빠르게 돌리는 `npm run test:unit`. 린트 경고 190 → 0 (`--fix`, `naming-convention`은 외부 JSON 필드명 snake_case·enum UPPER_CASE 허용, `eqeqeq`는 `== null` 허용, 나머지 지역 변수명 정리)
 - [x] **L1. 미사용 코드/리소스 삭제** (2026-11-03): `src/Java.ts`(실제로는 `Class<T>` 타입 하나만 쓰여 `SkriptDocument.ts`로 이동), `language/Materials.ts`, `language/SkriptEffects.ts`, `assets/ko_dict.json`, `src/resource/addon_syntax.json`, `src/resource/lang/default.lang`

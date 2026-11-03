@@ -3,6 +3,7 @@ import * as Skript from '../Skript';
 import { SkriptFunction } from '../SkriptComponent';
 import { SYMBOLS_MAP } from '../provider/SkriptDocumentSymbolProvider';
 import { refreshDiagnostics } from '../provider/SkriptDiagnostics';
+import { log } from '../Logger';
 
 // 🌟 [최적화 핵심] 타이핑 도중 폭발적으로 일어나는 파싱 및 진단 연산을 통제하는 단일 타이머 주머니
 let diagnosticTimeout: NodeJS.Timeout | undefined;
@@ -32,9 +33,9 @@ export default function onTextDocumentChange(event: vscode.TextDocumentChangeEve
         const skDocument = Skript.find(fsPath);
         if (skDocument) {
             skDocument.update(document.getText());
-            console.log(`[데이터 업데이트] 초고속 최적화 성공: ${document.fileName}`);
+            log.debug(`문서 갱신: ${document.fileName}`);
         } else {
-            console.log(`[데이터 업데이트] 실패: 모델을 찾을 수 없음 (${document.fileName})`);
+            log.debug(`문서 갱신 건너뜀 (스캔되지 않은 문서): ${document.fileName}`);
         }
 
         // 2. 개요(Outline) 캐시 비우기

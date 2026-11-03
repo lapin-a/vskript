@@ -28,6 +28,11 @@ export default tseslint.config(
             // `x == null`(null·undefined 동시 검사)은 허용
             eqeqeq: ['warn', 'always', { null: 'ignore' }],
             'no-throw-literal': 'warn',
+            // 전역 console을 덮어쓰면 같은 확장 호스트의 다른 확장 로그까지 바뀐다 (TODO H2) → Logger.ts 사용
+            'no-restricted-syntax': ['error', {
+                selector: "AssignmentExpression[left.object.name='console']",
+                message: '전역 console을 덮어쓰지 마세요. src/Vskript/Logger.ts의 log를 사용하세요.',
+            }],
             semi: 'warn',
         },
     },

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as Skript from "../Skript";
 import { buildSyntaxMarkdown, getSyntaxRegistry } from '../syntax/SyntaxRegistry';
+import { log } from '../Logger';
 
 /**
  * [Step 9 고도화] 설정창 분기 연동형 다기능 호버 제공자
@@ -123,7 +124,7 @@ export class SkriptHoverProvider implements vscode.HoverProvider {
                 }
             }
         } catch (error) {
-            console.error("🚨 [SkriptHoverProvider] 캐시 서치 예외 방어:", error);
+            log.error('호버: 함수 검색 실패:', error);
         }
 
         // 3단계: Skript/애드온 구문 (SyntaxRegistry)

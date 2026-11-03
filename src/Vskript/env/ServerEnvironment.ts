@@ -4,6 +4,7 @@ import * as path from 'path';
 import { readPluginDescriptor, PluginDescriptor } from './JarReader';
 import { resolveEnvironment, mismatchSignature, EnvironmentResult, Mismatch, SKRIPT_NAME } from './Environment';
 import { DataPackClient, DEFAULT_DATABASE_URL, LoadedPack, SyncReport } from './DataPackClient';
+import { initLogger, log } from '../Logger';
 
 // ============================================================
 // 서버 환경 감지 + 설정 병합 + DataPack 동기화 (vscode 연동부)
@@ -107,7 +108,7 @@ function describeMismatch(m: Mismatch): string {
 }
 
 export class ServerEnvironmentManager implements vscode.Disposable {
-    private readonly output: vscode.OutputChannel;
+    private readonly output: vscode.LogOutputChannel;
     private readonly statusBar: vscode.StatusBarItem;
     private readonly disposables: vscode.Disposable[] = [];
     private jarWatcher: vscode.FileSystemWatcher | null = null;
@@ -117,12 +118,11 @@ export class ServerEnvironmentManager implements vscode.Disposable {
     private rerunRequested = false;
 
     constructor(private readonly context: vscode.ExtensionContext) {
-        this.output = vscode.window.createOutputChannel('VSkript');
+        this.output = initLogger(context); // 확장 전체가 쓰는 'VSkript' 로그 채널 (해제는 로거가 담당)
         this.statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
         this.statusBar.command = 'vskript.showEnvironment';
 
         this.disposables.push(
-            this.output,
             this.statusBar,
             vscode.commands.registerCommand('vskript.refreshEnvironment', () => this.refresh({ userInitiated: true })),
             vscode.commands.registerCommand('vskript.showEnvironment', () => this.show()),
@@ -172,7 +172,7 @@ export class ServerEnvironmentManager implements vscode.Disposable {
             try {
                 detected = detectPlugins(pluginsFolder);
             } catch (err) {
-                this.log(`plugins 폴더 읽기 실패: ${pluginsFolder} — ${err}`);
+                log.error(`plugins 폴더 읽기 실패: ${pluginsFolder}`, err);
             }
         }
 
@@ -225,7 +225,7 @@ export class ServerEnvironmentManager implements vscode.Disposable {
             if (last) {await this.context.workspaceState.update(MISMATCH_STATE_KEY, '');}
             return;
         }
-        for (const m of mismatches) {this.log(`불일치 — ${describeMismatch(m)}`);}
+        for (const m of mismatches) {log.warn(`불일치 — ${describeMismatch(m)}`);}
         if (!force && signature === last) {return;}
         await this.context.workspaceState.update(MISMATCH_STATE_KEY, signature);
 
@@ -242,11 +242,11 @@ export class ServerEnvironmentManager implements vscode.Disposable {
     }
 
     private logSync(sync: SyncReport, result: EnvironmentResult) {
-        if (!sync.online) {this.log(`데이터베이스 연결 실패 — 캐시 사용: ${sync.indexError}`);}
+        if (!sync.online) {log.warn(`데이터베이스 연결 실패 — 캐시 사용: ${sync.indexError}`);}
         const downloaded = sync.loaded.filter(p => p.from === 'downloaded').map(p => p.name);
         const cached = sync.loaded.filter(p => p.from === 'cache').map(p => p.name);
         this.log(`DataPack: 새로 받음 ${downloaded.length}개${downloaded.length ? ` (${downloaded.join(', ')})` : ''}, 캐시 ${cached.length}개`);
-        for (const e of sync.errors) {this.log(`DataPack 오류 — ${e.name}: ${e.message}`);}
+        for (const e of sync.errors) {log.warn(`DataPack 오류 — ${e.name}: ${e.message}`);}
         // 설정에 직접 적었는데 데이터베이스에 없는 애드온만 알린다 (일반 플러그인은 원래 없음)
         const settingOnly = new Set(result.addons.filter(a => a.origin !== 'detected').map(a => a.name.toLowerCase()));
         const missing = sync.unknown.filter(n => settingOnly.has(n.toLowerCase()));
@@ -303,7 +303,7 @@ export class ServerEnvironmentManager implements vscode.Disposable {
     }
 
     private log(message: string) {
-        this.output.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
+        this.output.info(message); // 로그 채널이 시각을 붙인다
     }
 }
 

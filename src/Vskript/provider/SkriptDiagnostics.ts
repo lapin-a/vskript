@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { getSyntaxRegistry } from '../syntax/SyntaxRegistry';
+import { log } from '../Logger';
 
 export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vskript");
 
@@ -118,6 +119,6 @@ export function refreshDiagnostics(document: vscode.TextDocument) {
         skriptDiagnostics.set(document.uri, entries);
 
     } catch (error) {
-        console.error("🚨 [SkriptDiagnostics.ts] 최종 예외 방어선 붕괴:", error);
+        log.error('진단 실패:', error);
     }
 }

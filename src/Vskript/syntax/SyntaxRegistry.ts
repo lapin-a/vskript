@@ -5,6 +5,7 @@ import { EnvironmentState, getEffectiveSkriptVersion, getEnvironment, onDidChang
 import { normalizeName, SKRIPT_NAME } from '../env/Environment';
 import { compilePattern, CompiledPattern } from './SkriptPattern';
 import { isAvailableIn, parsedFromLegacy, parseInstalledVersion, ParsedVersionField, SimpleVersion } from './SyntaxVersion';
+import { log } from '../Logger';
 
 // ============================================================
 // 단일 구문 저장소.
@@ -210,7 +211,7 @@ export class SyntaxRegistry implements vscode.Disposable {
                     });
                 }
             } catch (err) {
-                console.error('[vskript] core_syntax.json 읽기 실패:', err);
+                log.error('core_syntax.json 읽기 실패:', err);
             }
         }
         this.bundledCache = result;
