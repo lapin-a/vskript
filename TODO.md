@@ -19,11 +19,11 @@
   - [ ] `vscode.window.createOutputChannel('VSkript')` 기반 전용 로거로 교체하고 전역 패치 제거
   - [ ] 미사용 `src/Vskript/patchLogger.ts`도 함께 삭제 (같은 방식의 패치 코드)
 
-### H3. 자동완성(Completion) 실제 동작 검증
+### H3. 자동완성/호버 실제 사용 환경 검증
 
-- **현재 상태**: H1 작업으로 `SkriptCompletionItemProvider.ts`를 `SyntaxRegistry` 기반으로 다시 작성함 (커밋 `a7c4ff1` 복원본 문제는 해소). 컴파일·레지스트리 단위 확인은 했지만 **확장을 실행한 상태의 자동완성 동작은 미확인**.
+- **현재 상태**: 통합 테스트(VS Code 1.120, `npm test`)로 활성화·명령 등록·구문 자동완성(버전별 제안 수 차이)·`{@` 옵션 완성·구문 호버는 자동 확인됨. 단 테스트는 저장되지 않은 문서 기준이며, **실제 서버 폴더 + 내려받은 DataPack + 한국어 번역 호버**는 미확인.
 - **해야 할 일**:
-  - [ ] 확장 실행 후 자동완성(`{@` 옵션, 구문 제안, 버전별 제안 수 변화), 호버(`vskript.language: ko`일 때 번역 설명) 동작 확인
+  - [ ] vskript-database의 번역된 DataPack push 후, 실제 서버 폴더에서 `vskript.language: ko` 호버 확인
   - [ ] `a7c4ff1` 작성자에게 의도했던 변경("use DocumentSymbol") 확인 후 필요하면 재적용
 
 ---
@@ -55,32 +55,16 @@
 
 ## 🟢 낮음
 
-### L1. 사용되지 않는 코드/리소스 정리
-
-- **현재 상태**: 아래 파일들은 어디서도 import/참조되지 않음.
-  - 코드: `src/Java.ts` (`patchLogger.ts`는 H2에서 처리)
-  - 리소스: `assets/ko_dict.json`, `src/resource/addon_syntax.json`, `src/resource/lang/default.lang`
-- **해야 할 일**:
-  - [ ] 삭제 검토 (`ko_dict.json`의 역할은 DataPack의 `guide.description`이 대신함 — H1)
-
-### L2. 테스트 / 린트
-
-- **현재 상태**: `npm test`가 `out/test/runTest.js`를 실행하지만 테스트 코드가 없음. `npm run lint` 결과 오류 0, 경고 200건(대부분 `curly`, 125건은 `--fix`로 자동 수정 가능).
-- **해야 할 일**:
-  - [ ] 최소한의 확장 활성화 테스트 추가 또는 `test`/`pretest` 스크립트 정리
-  - [ ] `eslint --fix`로 자동 수정 가능한 경고 정리
-
-### L3. 개발 도구 의존성 노후화
-
-- **현재 상태**: `eslint@7`, `@typescript-eslint@4`, `mocha@8`, `typescript@4`, `@types/node@12`, `vscode-test`(지원 종료, 후속은 `@vscode/test-electron`) 등 구버전이며 `npm audit`에 취약점 다수. 개발 환경에만 영향을 줌.
-- **해야 할 일**:
-  - [ ] `vscode-test` → `@vscode/test-electron` 교체
-  - [ ] eslint/typescript 계열 메이저 업그레이드 (L2와 함께 진행 권장)
+(없음)
 
 ---
 
 ## 완료된 항목
 
+- [x] **L3. 개발 도구 의존성 업그레이드** (2026-11-03): typescript 4 → 6.0(typescript-eslint가 `<6.1`까지 지원해 7.x는 보류), eslint 7 → 10 + typescript-eslint 8(`.eslintrc.json` → `eslint.config.mjs`), `vscode-test` → `@vscode/test-cli` + `@vscode/test-electron`, mocha 8 → 11, `@types/node` 12 → 22, `copyfiles` → `fs.cpSync`, 미사용 `glob`/`@types/glob` 제거. 런타임 의존성 취약점 0건. 남은 `npm audit` 17건은 전부 테스트 도구(mocha, @vscode/test-cli) 하위 의존성이며 상위 수정판 없음
+- [x] **L2. 테스트 / 린트** (2026-11-03): `npm test` = 컴파일 → 린트 → VS Code 1.120 통합 테스트(단위 5 + 통합 4). VS Code 없이 빠르게 돌리는 `npm run test:unit`. 린트 경고 190 → 0 (`--fix`, `naming-convention`은 외부 JSON 필드명 snake_case·enum UPPER_CASE 허용, `eqeqeq`는 `== null` 허용, 나머지 지역 변수명 정리)
+- [x] **L1. 미사용 코드/리소스 삭제** (2026-11-03): `src/Java.ts`(실제로는 `Class<T>` 타입 하나만 쓰여 `SkriptDocument.ts`로 이동), `language/Materials.ts`, `language/SkriptEffects.ts`, `assets/ko_dict.json`, `src/resource/addon_syntax.json`, `src/resource/lang/default.lang`
+- [x] **저장되지 않은 문서 열기 오류 수정** (2026-11-03): untitled `.sk` 문서를 열면 디스크 스캔이 ENOENT 예외를 내던 문제 (통합 테스트에서 발견)
 - [x] **H1. 내려받은 DataPack을 자동완성/호버/진단에 연결** (2026-11-03): `src/Vskript/syntax/`
   - `SyntaxRegistry`: 번들 `core_syntax.json` + DataPack을 하나로 합친 구문 저장소. Skript DataPack이 있으면 번들 core 대신 사용(번들은 오프라인·캐시 없음일 때 폴백). 자동완성·호버·진단은 이것만 봄 → `SkriptHubClient` 삭제(쓰이지 않던 `globalStorage/syntax_db.json` 쓰기도 제거)
   - 버전 필터(`SyntaxVersion`): `valid_from_addon_version_parsed`(+`valid_until_*`) 기준, 비교 규칙은 vskript-database `version.js`의 `compareVersions`와 동일. 설치 버전을 모르거나 시작 버전이 부정확(`before`/`or_earlier`/`unknown`)하면 숨기지 않음. Skript 버전 = 파일 주석 > 서버 환경, 애드온 버전 = 서버 환경
