@@ -18,13 +18,6 @@
 
 ## 🟠 중간
 
-### M1. 진단(Diagnostics) 병합 로직 / 경쟁 조건
-
-- **현재 상태**: `updateAllDiagnostics()`가 `refreshDiagnostics()`가 설정한 결과를 다시 읽어 버전 경고를 덧붙인 뒤 덮어씀. `setTimeout`으로 지연 실행되어 연속 호출 시 결과가 중복되거나 섞일 수 있음.
-- **해야 할 일**:
-  - [ ] 구문 진단과 버전 진단을 각각 배열로 계산한 뒤 한 번만 `set` 하도록 변경
-  - [ ] 문서별 디바운스 적용
-
 ### M2. 버전 호환성 진단 활성화
 
 - **현재 상태**: 진단의 버전 검사는 `enableSyntaxCheck = false`로 꺼져 있음. H1에서 검사 로직을 `SyntaxRegistry` 기준(현재 버전에 유효한 구문이 없고 다른 버전에는 있을 때 경고)으로 바꿔 두었고, 버전 결정은 파일 주석(`# version:` > `# mc:`) > 서버 환경 > 미상(미상이면 검사 안 함).
@@ -49,6 +42,7 @@
 
 ## 완료된 항목
 
+- [x] **M1. 진단 병합 로직 / 경쟁 조건** (2026-11-03): 진단 계산(`computeDiagnostics`)은 배열만 반환하고, `scheduleDiagnostics`가 문서별 타이머로 예약해 **한 번만** `set` (기존: 설정한 결과를 다시 읽어 덧붙인 뒤 또 설정). 빈 배열만 반환하던 `checkVersionCompatibility` 제거. 추가로 발견한 버그 수정: 문서 변경 디바운스 타이머가 전체에 하나뿐이라 A를 고친 뒤 350ms 안에 B를 고치면 **A의 모델·진단 갱신이 취소**되던 문제 → 문서별 타이머. 구문 데이터·설정 변경 시 활성 편집기만이 아니라 열린 모든 Skript 문서를 갱신, 문서를 닫으면 진단 삭제. 테스트 추가(옛 코드에서 실패 확인)
 - [x] **H3. 자동완성/호버 실제 사용 환경 검증** (2026-11-03): 통합 테스트 `src/test/suite/environment.test.ts`로 자동화 — 임시 서버 폴더(`plugins/Skript.jar`, Skript 2.10.0) 감지 → GitHub에서 DataPack 다운로드 → 감지 버전으로 자동완성 필터 → `vskript.language: ko` 한국어 호버 (오프라인이면 건너뜀). 이 과정에서 버그 발견·수정: 감지가 진행 중일 때(예: 시작 직후 첫 DataPack 다운로드) "다시 감지" 명령이 **옛 설정으로 시작된 결과**를 돌려주던 문제 → 진행 중인 감지가 끝나면 바로 한 번 더 감지하고 그 결과로 완료
   - `a7c4ff1`("use DocumentSymbol") 분석: 아웃라인(`SkriptDocumentSymbolProvider.ts`)에 넣으려던 변경 2개가 자동완성 파일에 잘못 덮어써진 것으로 판단 → 아웃라인에 적용. ① 함수 매개변수 타입이 `[object Object]`로 표시되던 버그 수정(`p.type.text`) ② 수정 중인 문서도 아웃라인 캐시 재사용(모델은 350ms 디바운스 때 갱신되므로 결과 동일, 계산만 줄어듦). 아웃라인 테스트 추가
 - [x] **H2. 전역 `console.log` 가로채기 제거** (2026-11-03): `activate()`의 전역 `console.log`/`console.info` 덮어쓰기와 미사용 `patchLogger.ts` 삭제. 새 `src/Vskript/Logger.ts`가 출력 패널의 "VSkript" 로그 채널(`LogOutputChannel`) 하나에 기록하며 `ServerEnvironment`도 같은 채널을 씀(같은 이름의 채널이 두 개 생기던 문제 해소). 타이핑·스캔마다 찍히던 기록은 debug 수준으로 내림(출력 패널에서 수준 변경 가능). 재발 방지: eslint `no-restricted-syntax`로 `console.* =` 대입을 **오류** 처리 → `npm test`(린트 포함)에서 실패. 런타임 테스트는 테스트 실행기가 console을 계속 다시 감싸서 함수 비교가 불가능해 쓰지 않음

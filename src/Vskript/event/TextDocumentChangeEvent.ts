@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import * as Skript from '../Skript';
 import { SkriptFunction } from '../SkriptComponent';
 import { SYMBOLS_MAP } from '../provider/SkriptDocumentSymbolProvider';
-import { refreshDiagnostics } from '../provider/SkriptDiagnostics';
+import { scheduleDiagnostics } from '../provider/SkriptDiagnostics';
 import { log } from '../Logger';
 
-// 🌟 [최적화 핵심] 타이핑 도중 폭발적으로 일어나는 파싱 및 진단 연산을 통제하는 단일 타이머 주머니
-let diagnosticTimeout: NodeJS.Timeout | undefined;
+// 타이핑 중의 모델 파싱·진단을 문서별로 디바운스한다 (key: uri 문자열).
+// 타이머가 하나뿐이면 A를 고친 뒤 350ms 안에 B를 고칠 때 A의 갱신이 취소된다.
+const updateTimers = new Map<string, NodeJS.Timeout>();
 
 /**
  * 문서 수정 이벤트 핸들러
@@ -23,12 +24,15 @@ export default function onTextDocumentChange(event: vscode.TextDocumentChangeEve
 
     // 🌟 [최적화 핵심 1] 렉을 유발하던 무거운 데이터 모델 파싱과 진단 작업을 
     // 통째로 디바운싱 타이머 내부로 격리합니다. 유저가 타자를 치는 동안에는 CPU 연산이 완전히 멈추고 쾌적해집니다!
-    if (diagnosticTimeout) {
-        clearTimeout(diagnosticTimeout);
+    const timerKey = document.uri.toString();
+    const pending = updateTimers.get(timerKey);
+    if (pending) {
+        clearTimeout(pending);
     }
 
     // 🌟 350ms 동안 추가 입력이 없을 때 딱 한 번만 완벽하게 동기화 처리
-    diagnosticTimeout = setTimeout(() => {
+    updateTimers.set(timerKey, setTimeout(() => {
+        updateTimers.delete(timerKey);
         // 1. 텍스트 파싱 업데이트 (타이머 내부로 안전하게 이식)
         const skDocument = Skript.find(fsPath);
         if (skDocument) {
@@ -41,11 +45,9 @@ export default function onTextDocumentChange(event: vscode.TextDocumentChangeEve
         // 2. 개요(Outline) 캐시 비우기
         SYMBOLS_MAP.delete(fsPath);
         
-        // 3. 구문 오타 및 밸런싱 진단 엔진 풀가동
-        refreshDiagnostics(document);
-        
-        diagnosticTimeout = undefined;
-    }, 350);
+        // 3. 진단 (갱신된 모델 기준으로 바로 계산)
+        scheduleDiagnostics(document, 0);
+    }, 350));
 
     // 🌟 [최적화 핵심 2] 불필요한 for 루프를 완전히 제거하고, 유저가 방금 입력한 마지막 이벤트(O(1))만 저격하여 
     // 엔터 주석 자동 완성 기능을 초고속으로 작동시킵니다. 반응 속도가 예술이 됩니다.

@@ -4,9 +4,52 @@ import { log } from '../Logger';
 
 export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vskript");
 
-export function checkVersionCompatibility(_skDoc: any): vscode.Diagnostic[] {
-    return [];
+// 문서별 진단 예약 타이머 (key: uri 문자열). 문서마다 따로 두어야 A를 고친 직후 B를 고쳐도 A가 누락되지 않는다.
+const timers = new Map<string, NodeJS.Timeout>();
+
+export function isSkriptDocument(document: vscode.TextDocument): boolean {
+    return document.languageId === 'vskript' || document.uri.fsPath.endsWith('.sk');
 }
+
+/**
+ * 진단을 예약한다. 같은 문서에 대한 이전 예약은 취소되고, 계산 결과는 한 번에 set 된다.
+ * (구문/들여쓰기/버전 진단을 모두 computeDiagnostics에서 배열로 만든 뒤 한 번만 설정)
+ */
+export function scheduleDiagnostics(document: vscode.TextDocument, delayMs = 5) {
+    if (!isSkriptDocument(document)) {return;}
+    const key = document.uri.toString();
+    const pending = timers.get(key);
+    if (pending) {clearTimeout(pending);}
+    timers.set(key, setTimeout(() => {
+        timers.delete(key);
+        if (document.isClosed) {
+            skriptDiagnostics.delete(document.uri);
+            return;
+        }
+        skriptDiagnostics.set(document.uri, computeDiagnostics(document));
+    }, delayMs));
+}
+
+/** 열려 있는 모든 Skript 문서의 진단을 다시 계산 (구문 데이터·설정 변경 시) */
+export function scheduleAllDiagnostics() {
+    for (const document of vscode.workspace.textDocuments) {scheduleDiagnostics(document);}
+}
+
+/** 문서를 닫으면 예약을 취소하고 진단을 지운다 */
+export function clearDiagnostics(document: vscode.TextDocument) {
+    const key = document.uri.toString();
+    const pending = timers.get(key);
+    if (pending) {clearTimeout(pending);}
+    timers.delete(key);
+    skriptDiagnostics.delete(document.uri);
+}
+
+export const diagnosticTimers: vscode.Disposable = {
+    dispose() {
+        for (const t of timers.values()) {clearTimeout(t);}
+        timers.clear();
+    },
+};
 
 /**
  * 들여쓰기 무결점 검사 레이어
@@ -60,11 +103,9 @@ function validateIndentation(document: vscode.TextDocument): vscode.Diagnostic[]
 }
 
 /**
- * 핵심 실시간 진단 실행 엔진
+ * 문서 하나의 진단을 계산한다 (설정은 하지 않음 — scheduleDiagnostics가 한 번에 set).
  */
-export function refreshDiagnostics(document: vscode.TextDocument) {
-    if (!document) {return;}
-
+export function computeDiagnostics(document: vscode.TextDocument): vscode.Diagnostic[] {
     try {
         const entries: vscode.Diagnostic[] = [];
         const lineCount = document.lineCount;
@@ -116,9 +157,9 @@ export function refreshDiagnostics(document: vscode.TextDocument) {
         const indentationDiagnostics = validateIndentation(document);
         entries.push(...indentationDiagnostics);
 
-        skriptDiagnostics.set(document.uri, entries);
-
+        return entries;
     } catch (error) {
         log.error('진단 실패:', error);
+        return [];
     }
 }

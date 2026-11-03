@@ -68,6 +68,37 @@ suite('VSkript 확장', () => {
         }
     });
 
+    test('여러 문서를 연달아 고쳐도 각 문서의 진단이 한 번씩 갱신된다', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vskript-diag-'));
+        const fileA = path.join(dir, 'a.sk');
+        const fileB = path.join(dir, 'b.sk');
+        fs.writeFileSync(fileA, 'on load:\n\tbroadcast "a"\n');
+        fs.writeFileSync(fileB, 'on load:\n\tbroadcast "b"\n');
+        const colonErrors = (uri: vscode.Uri) => vscode.languages.getDiagnostics(uri).filter(d => d.message.includes("콜론(':')")).length;
+        try {
+            const docA = await vscode.workspace.openTextDocument(vscode.Uri.file(fileA));
+            const docB = await vscode.workspace.openTextDocument(vscode.Uri.file(fileB));
+            await new Promise(r => setTimeout(r, 300));
+            assert.strictEqual(colonErrors(docA.uri), 0);
+
+            // A의 콜론을 지운 직후(350ms 디바운스 안에) B를 고친다
+            const editA = new vscode.WorkspaceEdit();
+            editA.delete(docA.uri, new vscode.Range(0, 7, 0, 8));
+            await vscode.workspace.applyEdit(editA);
+            const editB = new vscode.WorkspaceEdit();
+            editB.insert(docB.uri, new vscode.Position(1, 0), '\tbroadcast "b2"\n');
+            await vscode.workspace.applyEdit(editB);
+
+            await new Promise(r => setTimeout(r, 800));
+            assert.strictEqual(docA.lineAt(0).text, 'on load');
+            assert.strictEqual(colonErrors(docA.uri), 1, 'A의 콜론 누락 진단이 정확히 1개여야 함');
+            assert.strictEqual(colonErrors(docB.uri), 0);
+        } finally {
+            await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     test('구문 호버를 보여 준다', async () => {
         const doc = await openSkript('on load:\n\tbroadcast "hello"\n');
         const hovers = await vscode.commands.executeCommand<vscode.Hover[]>('vscode.executeHoverProvider', doc.uri, new vscode.Position(1, 3));

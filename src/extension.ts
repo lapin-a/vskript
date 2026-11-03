@@ -6,40 +6,10 @@ import * as Skript from './Vskript/Skript';
 import * as Provider from './Vskript/provider/Provider';
 import onTextDocumentChange from './Vskript/event/TextDocumentChangeEvent';
 import { LEGEND } from './Vskript/provider/SkriptDocumentSemanticTokensProvider';
-import { refreshDiagnostics, checkVersionCompatibility, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
+import { clearDiagnostics, diagnosticTimers, scheduleAllDiagnostics, scheduleDiagnostics, skriptDiagnostics } from './Vskript/provider/SkriptDiagnostics';
 import { initSyntaxRegistry } from './Vskript/syntax/SyntaxRegistry';
 import { ServerEnvironmentManager, getEnvironment } from './Vskript/env/ServerEnvironment';
 import { initLogger, log } from './Vskript/Logger';
-
-/**
- * [최적화] 진단 연산을 비동기로 격리하여 메인 UI 스레드 프리징을 원천 차단합니다.
- */
-export function updateAllDiagnostics(document: vscode.TextDocument) {
-    if (!document) {return;}
-    const isSkFile = document.uri.fsPath.endsWith('.sk');
-    const isVSkriptLanguage = document.languageId === 'vskript';
-    if (!isSkFile && !isVSkriptLanguage) {return;}
-
-    // 🌟 [핵심] 무거운 정규식 진단 연산을 비동기 큐로 빼서 파일 오픈/전환 렉을 완전히 소멸시킵니다.
-    setTimeout(() => {
-        try {
-            const finalDiagnostics: vscode.Diagnostic[] = [];
-            refreshDiagnostics(document);
-            const syntaxEntries = skriptDiagnostics.get(document.uri) || [];
-            finalDiagnostics.push(...syntaxEntries);
-            
-            const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
-            const skDoc = Skript.find(fsPath);
-            if (skDoc) {
-                const versionIssues = checkVersionCompatibility(skDoc);
-                finalDiagnostics.push(...versionIssues);
-            }
-            skriptDiagnostics.set(document.uri, finalDiagnostics);
-        } catch (error) {
-            log.error('진단 갱신 실패:', error);
-        }
-    }, 5); // 5ms의 미세 지연을 주어 에디터 화면 렌더링 및 포커스가 먼저 완료되도록 유도
-}
 
 export async function activate(context: ExtensionContext) {
     initLogger(context);
@@ -53,10 +23,7 @@ export async function activate(context: ExtensionContext) {
     context.subscriptions.push(
         environment,
         // 환경 변경 → 레지스트리 재로딩 → 진단 갱신
-        syntaxRegistry.onDidReload(() => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {updateAllDiagnostics(editor.document);}
-        }),
+        syntaxRegistry.onDidReload(() => scheduleAllDiagnostics()),
         // plugins 폴더를 아직 못 찾았다면, 다른 .sk 파일을 열 때 다시 찾아본다
         vscode.window.onDidChangeActiveTextEditor(editor => {
             const env = getEnvironment();
@@ -101,7 +68,7 @@ export async function activate(context: ExtensionContext) {
                 log.error('현재 폴더 스캔 실패:', err);
             }
         }
-        updateAllDiagnostics(activeEditor.document);
+        scheduleDiagnostics(activeEditor.document);
     }
 
     log.info('초기 스캔 완료');
@@ -114,8 +81,7 @@ export async function activate(context: ExtensionContext) {
                 // 저장되지 않은 문서(untitled 등)는 디스크에 파일이 없으므로 스캔하지 않는다
                 if (!skDocument && document.uri.scheme === 'file') {skDocument = Skript.scanSingleFile(document.uri);}
                 
-                // 비동기로 격리된 진단 연산 호출
-                updateAllDiagnostics(document);
+                scheduleDiagnostics(document);
                 
                 setTimeout(() => {
                     vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', document.uri);
@@ -126,12 +92,11 @@ export async function activate(context: ExtensionContext) {
             onTextDocumentChange(event);
         }),
         workspace.onDidChangeConfiguration(async (e) => {
-            if (e.affectsConfiguration('vskript')) {
-                const editor = vscode.window.activeTextEditor;
-                if (editor) {updateAllDiagnostics(editor.document);}
-            }
+            if (e.affectsConfiguration('vskript')) {scheduleAllDiagnostics();}
         }),
-        skriptDiagnostics
+        workspace.onDidCloseTextDocument(document => clearDiagnostics(document)),
+        skriptDiagnostics,
+        diagnosticTimers,
     );
 
     const watcher = workspace.createFileSystemWatcher('**/*.sk');
