@@ -136,7 +136,8 @@ export async function activate(context: ExtensionContext) {
             if (document.languageId === 'vskript' || document.uri.fsPath.endsWith('.sk')) {
                 const fsPath = vscode.Uri.file(document.uri.fsPath).fsPath;
                 let skDocument = Skript.find(fsPath);
-                if (!skDocument) skDocument = Skript.scanSingleFile(document.uri);
+                // 저장되지 않은 문서(untitled 등)는 디스크에 파일이 없으므로 스캔하지 않는다
+                if (!skDocument && document.uri.scheme === 'file') skDocument = Skript.scanSingleFile(document.uri);
                 
                 // 비동기로 격리된 진단 연산 호출
                 updateAllDiagnostics(document);
