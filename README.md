@@ -219,6 +219,35 @@ Use the `Ctrl+Space` shortcut to bring up the function auto-completion list.
 
 <br>
 
+### 9. 코드 스니펫
+
+접두어를 입력하고 자동완성에서 선택하면 코드 조각이 펼쳐집니다. 함수 스니펫은 파일 이름을 함수 이름 앞에 붙입니다.
+
+| 접두어 | 결과 (`myscript.sk`에서) |
+| --- | --- |
+| `_func` | `function myscript_Name():` |
+| `_funcr` | 반환형이 있는 함수 (`function myscript_Name() :: return_type:` + `return`) |
+| `_fx` | `function fxmyscriptName():` |
+| `_fxr` | 반환형이 있는 `fx` 함수 |
+| `if`, `else if`, `else`, `if else`, `while`, `loop` | 조건·반복 블록 |
+| `set`, `add`, `remove`, `give`, `send`, `send action bar`, `broadcast`, `wait`, `teleport`, `break` | 자주 쓰는 효과 |
+| `<#` | 헥사 색상 `<##000000>` |
+
+**Code Snippets**
+Type a prefix and pick it from the completion list. Function snippets prefix the function name with the file name.
+
+| Prefix | Result (in `myscript.sk`) |
+| --- | --- |
+| `_func` | `function myscript_Name():` |
+| `_funcr` | Function with a return type (`function myscript_Name() :: return_type:` + `return`) |
+| `_fx` | `function fxmyscriptName():` |
+| `_fxr` | `fx` function with a return type |
+| `if`, `else if`, `else`, `if else`, `while`, `loop` | Condition and loop blocks |
+| `set`, `add`, `remove`, `give`, `send`, `send action bar`, `broadcast`, `wait`, `teleport`, `break` | Common effects |
+| `<#` | Hex color `<##000000>` |
+
+<br>
+
 ## 설정
 
 | 설정 | 타입 | 기본값 | 설명 |

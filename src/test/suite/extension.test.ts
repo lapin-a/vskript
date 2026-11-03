@@ -6,6 +6,15 @@ import * as vscode from 'vscode';
 
 const EXTENSION_ID = 'Vhone.vskript';
 
+/** 임시 폴더 삭제 (Windows에서 파일 감시 등으로 잠겨 있으면 재시도 후 무시) */
+function removeTempDir(dir: string) {
+    try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {
+        // 임시 폴더이므로 남아도 무방
+    }
+}
+
 async function openSkript(content: string): Promise<vscode.TextDocument> {
     const doc = await vscode.workspace.openTextDocument({ language: 'vskript', content });
     await vscode.window.showTextDocument(doc);
@@ -64,7 +73,7 @@ suite('VSkript 확장', () => {
             assert.match(fn, /name: text/);
         } finally {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-            fs.rmSync(dir, { recursive: true, force: true });
+            removeTempDir(dir);
         }
     });
 
@@ -95,7 +104,7 @@ suite('VSkript 확장', () => {
             assert.strictEqual(colonErrors(docB.uri), 0);
         } finally {
             await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-            fs.rmSync(dir, { recursive: true, force: true });
+            removeTempDir(dir);
         }
     });
 
@@ -114,6 +123,38 @@ suite('VSkript 확장', () => {
         assert.strictEqual((await versionWarnings('# version: 2.15\n')).length, 0);
         // 버전 주석이 없고 서버 환경도 없으면 검사하지 않는다
         assert.strictEqual((await versionWarnings('')).length, 0);
+    });
+
+    test('스니펫: _func/_funcr/_fx/_fxr이 자동완성에 나오고, 파일 이름을 넣어 펼쳐진다', async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vskript-snippet-'));
+        const file = path.join(dir, 'myscript.sk');
+        fs.writeFileSync(file, '\n');
+        try {
+            const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+            const editor = await vscode.window.showTextDocument(doc);
+
+            const list = await vscode.commands.executeCommand<vscode.CompletionList>('vscode.executeCompletionItemProvider', doc.uri, new vscode.Position(0, 0));
+            const snippetLabels = list.items
+                .filter(i => i.kind === vscode.CompletionItemKind.Snippet)
+                .map(i => (typeof i.label === 'string' ? i.label : i.label.label));
+            for (const prefix of ['_func', '_funcr', '_fx', '_fxr']) {
+                assert.ok(snippetLabels.includes(prefix), `스니펫 ${prefix} 없음: ${JSON.stringify(snippetLabels.slice(0, 30))}`);
+            }
+
+            const expand = async (name: string) => {
+                await editor.edit(b => b.delete(new vscode.Range(0, 0, doc.lineCount, 0)));
+                editor.selection = new vscode.Selection(0, 0, 0, 0);
+                await vscode.commands.executeCommand('editor.action.insertSnippet', { langId: 'vskript', name });
+                // 들여쓰기는 사용자 편집기 설정(탭/공백)을 따르므로 탭으로 맞춰 비교
+                return doc.getText().replace(/\r\n/g, '\n').replace(/^(?: {4}|\t)/gm, '\t').trimEnd();
+            };
+            assert.strictEqual(await expand('Function Void'), 'function myscript_Name():');
+            assert.strictEqual(await expand('Function Return'), 'function myscript_Name() :: return_type:\n\t# code\n\treturn {_return_type}');
+            assert.strictEqual(await expand('Function Void Inner'), 'function fxmyscriptName():');
+        } finally {
+            await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+            removeTempDir(dir);
+        }
     });
 
     test('구문 호버를 보여 준다', async () => {

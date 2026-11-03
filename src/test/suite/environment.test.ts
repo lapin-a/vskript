@@ -110,7 +110,7 @@ suite('실제 사용 흐름: 서버 폴더 → DataPack → 한국어 호버', f
         for (const k of keys) {
             if (saved.has(k)) {await config().update(k, saved.get(k), vscode.ConfigurationTarget.Global);}
         }
-        if (serverDir) {fs.rmSync(serverDir, { recursive: true, force: true });}
+        if (serverDir) {try { fs.rmSync(serverDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* 임시 폴더 */ }}
     });
 
     test('plugins 폴더에서 감지한 Skript 버전으로 자동완성을 거른다', async () => {
