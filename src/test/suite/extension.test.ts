@@ -99,6 +99,23 @@ suite('VSkript 확장', () => {
         }
     });
 
+    test('현재 버전에서 쓸 수 없는 구문을 경고한다', async () => {
+        const body = 'on load:\n\tcatch runtime errors:\n\t\tset {_x} to 5\n\tbroadcast "hi"\n';
+        const versionWarnings = async (header: string) => {
+            const doc = await openSkript(header + body);
+            await new Promise(r => setTimeout(r, 300));
+            return vscode.languages.getDiagnostics(doc.uri).filter(d => d.code === 'vskript-version-mismatch');
+        };
+        // catch runtime errors는 2.12에 추가됨
+        const old = await versionWarnings('# version: 2.10\n');
+        assert.strictEqual(old.length, 1, JSON.stringify(old.map(d => d.message)));
+        assert.strictEqual(old[0].range.start.line, 2);
+        assert.match(old[0].message, /2\.12/);
+        assert.strictEqual((await versionWarnings('# version: 2.15\n')).length, 0);
+        // 버전 주석이 없고 서버 환경도 없으면 검사하지 않는다
+        assert.strictEqual((await versionWarnings('')).length, 0);
+    });
+
     test('구문 호버를 보여 준다', async () => {
         const doc = await openSkript('on load:\n\tbroadcast "hello"\n');
         const hovers = await vscode.commands.executeCommand<vscode.Hover[]>('vscode.executeHoverProvider', doc.uri, new vscode.Position(1, 3));

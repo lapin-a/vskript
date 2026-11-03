@@ -18,9 +18,13 @@
 4. Hover
 	- Hovering over a statement shows its description, patterns and supported version (with a warning if it is not available in your version)
 	- Shows Korean descriptions when `vskript.language` is `ko` (1,219 core Skript syntaxes translated)
-5. Removed
+5. Diagnostics
+	- Warns about syntax not available in your current Skript/addon version (turn off with `vskript.diagnostics.versionCheck`)
+	- Fixed: editing several documents in a row skipped the earlier document's diagnostics update
+	- Fixed: diagnostics could disappear after closing and reopening a document
+6. Removed
 	- The `# addons:` file comment (it worked without real data). Specify addons via server detection or the `vskript.addons` setting
-6. Fixed
+7. Fixed
 	- The v0.1.0 source did not compile
 	- Opening a new unsaved document caused an error
 	- Code snippets were not registered

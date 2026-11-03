@@ -111,6 +111,11 @@
 					"type": "string",
 					"default": "https://raw.githubusercontent.com/lapin-a/vskript-database/main/datapacks/skripthub-net/",
 					"description": "구문 데이터(DataPack) 저장소 주소 (index.json이 있는 폴더)."
+				},
+				"vskript.diagnostics.versionCheck": {
+					"type": "boolean",
+					"default": true,
+					"description": "현재 Skript/애드온 버전에서 쓸 수 없는 구문(이후 버전에 추가된 구문)을 경고합니다. 버전은 파일 주석(# version:, # mc:) 또는 서버 환경에서 정합니다."
 				}
 			}
 		},

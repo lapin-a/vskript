@@ -195,14 +195,16 @@ Use the `Ctrl+Space` shortcut to bring up the function auto-completion list.
 
 - 이벤트, 명령어, 함수, `options` 줄 끝의 콜론(`:`) 누락
 - 들여쓰기 탭·공백 혼용, 섹션 아래 들여쓰기 깊이
-
-> 구문별 버전 호환성 검사는 아직 꺼져 있습니다 (오탐 검증 중).
+- **버전 경고**: 현재 Skript·애드온 버전에서 쓸 수 없는 구문(이후 버전에 추가된 구문)을 경고합니다.
+  효과·조건·이벤트·섹션 단위로 줄 전체를 비교하며, 확실한 경우에만 경고합니다 (Skript 2.15.4 공식 테스트 12,576줄 기준 오탐 0건).
+  버전을 알 수 없으면 검사하지 않고, `vskript.diagnostics.versionCheck`로 끌 수 있습니다.
 
 **Diagnostics**
 - Missing colon (`:`) at the end of event, command, function and `options` lines
 - Mixed tabs/spaces and indentation depth under a section
-
-> Per-syntax version compatibility checks are not enabled yet (false positives are being evaluated).
+- **Version warnings**: syntax that is not available in your current Skript/addon version (added in a later version) is flagged.
+  Whole lines are compared against effects, conditions, events and sections, and only clear cases are reported (0 false positives on the 12,576 lines of Skript 2.15.4's own tests).
+  Nothing is checked when the version is unknown; turn it off with `vskript.diagnostics.versionCheck`.
 
 ### 8. 서버 환경 감지와 구문 데이터
 
@@ -228,6 +230,7 @@ Use the `Ctrl+Space` shortcut to bring up the function auto-completion list.
 | `vskript.addons` | `string[]` | `[]` | 사용 애드온 (`이름` 또는 `이름@버전`, 예: `SkBee@3.5.0`). 감지 결과에 추가하거나 버전을 덮어씁니다. |
 | `vskript.database.autoDownload` | `boolean` | `true` | 사용 중인 Skript/애드온의 구문 데이터를 vskript-database에서 자동으로 내려받습니다 (바뀐 것만, 오프라인 시 캐시 사용). |
 | `vskript.database.url` | `string` | GitHub raw 주소 | 구문 데이터 저장소 주소. |
+| `vskript.diagnostics.versionCheck` | `boolean` | `true` | 현재 버전에서 쓸 수 없는 구문을 경고합니다. |
 
 서버 환경은 상태 표시줄에 표시되며, 클릭하거나 명령 팔레트의 `VSkript: 서버 환경 보기`로 감지 결과를 확인할 수 있습니다.
 
@@ -242,6 +245,7 @@ Use the `Ctrl+Space` shortcut to bring up the function auto-completion list.
 | `vskript.addons` | `string[]` | `[]` | Addons in use (`name` or `name@version`, e.g. `SkBee@3.5.0`). Added to / overrides detected addons. |
 | `vskript.database.autoDownload` | `boolean` | `true` | Automatically downloads syntax data for your Skript/addons from vskript-database (only changed packs; cached for offline use). |
 | `vskript.database.url` | `string` | GitHub raw URL | Syntax data repository URL. |
+| `vskript.diagnostics.versionCheck` | `boolean` | `true` | Warns about syntax not available in your current version. |
 
 The detected server environment is shown in the status bar; click it or run `VSkript: 서버 환경 보기` (Show Server Environment) from the command palette for details.
 

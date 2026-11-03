@@ -51,6 +51,16 @@ export interface VersionContext {
 
 const SKRIPT_KEY = normalizeName(SKRIPT_NAME);
 
+// ---- 버전 검사 (진단) ----
+// 줄 전체와 맞춰 볼 수 있는 "문장 단위" 구문만 쓴다. expression/type은 문장 안에 들어가는 조각이라 제외.
+const STATEMENT_TYPES = new Set(['effect', 'condition', 'event', 'section', 'structure']);
+// 현재 버전에서 맞는지 볼 때: 고정 글자 0자인 메타 패턴(`<.+>` 등 무엇에나 맞음)만 제외
+const MIN_SPECIFICITY_AVAILABLE = 1;
+// 경고 근거(다른 버전에서만 맞는 구문)는 고정 글자 6자 이상이어야 한다.
+// Skript 2.15.4 공식 테스트 12,576줄 기준: 2.15.4로 검사 시 경고 0건(오탐 0), 2.10으로 검사 시 135건 모두 2.11~2.14 구문
+const MIN_SPECIFICITY_EVIDENCE = 6;
+const ISSUE_CACHE_LIMIT = 5000;
+
 function toText(value: unknown): string {
     if (value == null) {return '';}
     if (Array.isArray(value)) {return value.map(v => String(v)).join('\n');}
@@ -112,6 +122,8 @@ export class SyntaxRegistry implements vscode.Disposable {
     private entries: SyntaxEntry[] = [];
     private addonVersions = new Map<string, SimpleVersion | null>();
     private bundledCache: SyntaxEntry[] | null = null;
+    /** findVersionIssue 결과 캐시 (key: 버전 + 줄). 다시 읽으면 비운다 */
+    private readonly issueCache = new Map<string, SyntaxEntry | null>();
     private readonly reloadEmitter = new vscode.EventEmitter<void>();
     private readonly disposables: vscode.Disposable[] = [];
     /** 구문 데이터를 다시 읽은 뒤 발생 */
@@ -153,6 +165,7 @@ export class SyntaxRegistry implements vscode.Disposable {
         }
 
         this.entries = entries;
+        this.issueCache.clear();
         this.addonVersions = versions;
         this.reloadEmitter.fire();
     }
@@ -244,6 +257,56 @@ export class SyntaxRegistry implements vscode.Disposable {
     /** 현재 버전에서 유효한 구문 */
     getAvailable(ctx: VersionContext): SyntaxEntry[] {
         return this.entries.filter(e => this.isAvailable(e, ctx));
+    }
+
+    /** 사람이 읽을 설치 버전 ("2.10.0") */
+    installedVersionText(entry: SyntaxEntry, ctx: VersionContext): string | null {
+        if (entry.addonKey === SKRIPT_KEY) {return ctx.skriptText;}
+        const v = ctx.addons.get(entry.addonKey);
+        return v ? [v.parts.join('.'), v.pre].filter(Boolean).join('-') : null;
+    }
+
+    /** 문장으로 볼 줄의 후보 문자열 (주석·끝 콜론 제거, "on " / "if " 등 접두사를 뗀 형태 포함) */
+    private statementVariants(line: string): string[] | null {
+        const text = line.replace(/(^|\s)#(?!#).*$/, '').trim().replace(/:$/, '').trim();
+        if (!text || text.length > 300) {return null;}
+        const variants = [text];
+        if (/^on\s+/i.test(text)) {variants.push(text.replace(/^on\s+/i, ''));}
+        const cond = text.match(/^(?:else if|if|while|parse if)\s+(.+)$/i);
+        if (cond) {variants.push(cond[1]);}
+        return variants;
+    }
+
+    private matchStatement(variants: string[], ctx: VersionContext | null, minSpecificity: number): SyntaxEntry | null {
+        let best: { entry: SyntaxEntry; score: number } | null = null;
+        for (const entry of this.entries) {
+            if (!STATEMENT_TYPES.has(entry.type)) {continue;}
+            if (ctx && !this.isAvailable(entry, ctx)) {continue;}
+            for (const p of entry.patterns) {
+                if (!p.regex || p.specificity < minSpecificity || (best && p.specificity <= best.score)) {continue;}
+                if (variants.some(v => p.regex!.test(v))) {best = { entry, score: p.specificity };}
+            }
+        }
+        return best ? best.entry : null;
+    }
+
+    /**
+     * 이 줄이 현재 버전에서 쓸 수 없는 구문이면 그 구문을 돌려준다 (진단용).
+     * 현재 버전의 문장 구문 중 하나라도 맞으면 null — 확실한 근거(고정 글자 6자 이상)가 있을 때만 경고한다.
+     */
+    findVersionIssue(line: string, ctx: VersionContext): SyntaxEntry | null {
+        const variants = this.statementVariants(line);
+        if (!variants) {return null;}
+        const key = `${ctx.skriptText ?? ''}\u0000${variants[0]}`;
+        const cached = this.issueCache.get(key);
+        if (cached !== undefined) {return cached;}
+
+        const result = this.matchStatement(variants, ctx, MIN_SPECIFICITY_AVAILABLE)
+            ? null
+            : this.matchStatement(variants, null, MIN_SPECIFICITY_EVIDENCE);
+        if (this.issueCache.size >= ISSUE_CACHE_LIMIT) {this.issueCache.clear();}
+        this.issueCache.set(key, result);
+        return result;
     }
 
     /**

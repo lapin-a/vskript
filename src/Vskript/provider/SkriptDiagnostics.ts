@@ -7,6 +7,11 @@ export const skriptDiagnostics = vscode.languages.createDiagnosticCollection("vs
 // 문서별 진단 예약 타이머 (key: uri 문자열). 문서마다 따로 두어야 A를 고친 직후 B를 고쳐도 A가 누락되지 않는다.
 const timers = new Map<string, NodeJS.Timeout>();
 
+/** 지금 열려 있는 문서를 uri로 찾는다 (닫혔으면 undefined) */
+export function findOpenDocument(key: string): vscode.TextDocument | undefined {
+    return vscode.workspace.textDocuments.find(d => !d.isClosed && d.uri.toString() === key);
+}
+
 export function isSkriptDocument(document: vscode.TextDocument): boolean {
     return document.languageId === 'vskript' || document.uri.fsPath.endsWith('.sk');
 }
@@ -20,13 +25,16 @@ export function scheduleDiagnostics(document: vscode.TextDocument, delayMs = 5) 
     const key = document.uri.toString();
     const pending = timers.get(key);
     if (pending) {clearTimeout(pending);}
+    // 문서 객체가 아니라 uri로 기억한다: untitled 문서 등은 닫힌 뒤 같은 uri가 다시 쓰이므로,
+    // 옛 문서 객체를 붙잡고 있으면 새 문서의 진단을 지워 버린다.
     timers.set(key, setTimeout(() => {
         timers.delete(key);
-        if (document.isClosed) {
-            skriptDiagnostics.delete(document.uri);
+        const current = findOpenDocument(key);
+        if (!current) {
+            skriptDiagnostics.delete(vscode.Uri.parse(key));
             return;
         }
-        skriptDiagnostics.set(document.uri, computeDiagnostics(document));
+        skriptDiagnostics.set(current.uri, computeDiagnostics(current));
     }, delayMs));
 }
 
@@ -41,7 +49,14 @@ export function clearDiagnostics(document: vscode.TextDocument) {
     const pending = timers.get(key);
     if (pending) {clearTimeout(pending);}
     timers.delete(key);
+    for (const listener of closeListeners) {listener(key);}
     skriptDiagnostics.delete(document.uri);
+}
+
+/** 문서가 닫힐 때 다른 모듈의 예약(문서 변경 디바운스 등)도 취소할 수 있게 한다 */
+const closeListeners: ((key: string) => void)[] = [];
+export function onDocumentClosed(listener: (key: string) => void) {
+    closeListeners.push(listener);
 }
 
 export const diagnosticTimers: vscode.Disposable = {
@@ -110,13 +125,12 @@ export function computeDiagnostics(document: vscode.TextDocument): vscode.Diagno
         const entries: vscode.Diagnostic[] = [];
         const lineCount = document.lineCount;
 
-        // 버전 검사: 구문 데이터(SyntaxRegistry)와 대조해 현재 버전에서 쓸 수 없는 구문을 경고.
-        // 버전 결정 = 파일 주석(# version: / # mc:) > 서버 환경 > 미상(미상이면 검사 안 함).
-        // 🌟 [임시 조치] 패턴 매칭 정확도 검증 전까지 가짜 경고를 막기 위해 꺼 둠 (TODO M2)
-        const enableSyntaxCheck = false;
+        // 버전 검사: 현재 버전에서 쓸 수 없는 구문을 경고 (SyntaxRegistry.findVersionIssue).
+        // 버전 결정 = 파일 주석(# version: / # mc:) > 서버 환경 > 미상(미상이면 해당 애드온은 검사 안 함).
+        const enableVersionCheck = vscode.workspace.getConfiguration('vskript').get<boolean>('diagnostics.versionCheck', true);
         const registry = getSyntaxRegistry();
         const ctx = registry ? registry.contextFor(document) : null;
-        const versionCheck = enableSyntaxCheck && registry && ctx && ctx.skript ? { registry, ctx } : null;
+        const versionCheck = enableVersionCheck && registry && ctx ? { registry, ctx } : null;
 
         for (let i = 0; i < lineCount; i++) {
             const line = document.lineAt(i);
@@ -140,12 +154,12 @@ export function computeDiagnostics(document: vscode.TextDocument): vscode.Diagno
                 ));
             }
 
-            // 2️⃣ [버전 검사] 현재 버전에서 유효한 구문이 없고, 다른 버전에서는 유효한 구문이 있을 때만 경고
-            if (versionCheck && !versionCheck.registry.findMatch(text, versionCheck.ctx)) {
-                const entry = versionCheck.registry.findMatch(text, null);
+            // 2️⃣ [버전 검사] 현재 버전에서 맞는 문장 구문이 없고, 다른 버전 구문과는 확실히 맞을 때만 경고
+            if (versionCheck) {
+                const entry = versionCheck.registry.findVersionIssue(text, versionCheck.ctx);
                 if (entry) {
-                    const installed = entry.addonKey === 'skript' ? versionCheck.ctx.skriptText : null;
-                    const message = `⚠️ [vskript] '${entry.title}'(${entry.addon})은 현재 버전${installed ? ` v${installed}` : ''}에서 사용할 수 없습니다.${entry.validFromText ? ` (지원: ${entry.validFromText})` : ''}`;
+                    const installed = versionCheck.registry.installedVersionText(entry, versionCheck.ctx);
+                    const message = `'${entry.title}'은(는) 현재 ${entry.addon}${installed ? ` ${installed}` : ''}에서 사용할 수 없는 구문입니다.${entry.validFromText ? ` (지원: ${entry.validFromText})` : ''}`;
                     const startChar = text.indexOf(text.trim());
                     const diagnostic = new vscode.Diagnostic(new vscode.Range(i, startChar, i, text.length), message, vscode.DiagnosticSeverity.Warning);
                     diagnostic.code = 'vskript-version-mismatch';

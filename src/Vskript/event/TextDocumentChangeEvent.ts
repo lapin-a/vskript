@@ -2,12 +2,17 @@ import * as vscode from 'vscode';
 import * as Skript from '../Skript';
 import { SkriptFunction } from '../SkriptComponent';
 import { SYMBOLS_MAP } from '../provider/SkriptDocumentSymbolProvider';
-import { scheduleDiagnostics } from '../provider/SkriptDiagnostics';
+import { findOpenDocument, onDocumentClosed, scheduleDiagnostics } from '../provider/SkriptDiagnostics';
 import { log } from '../Logger';
 
 // 타이핑 중의 모델 파싱·진단을 문서별로 디바운스한다 (key: uri 문자열).
 // 타이머가 하나뿐이면 A를 고친 뒤 350ms 안에 B를 고칠 때 A의 갱신이 취소된다.
 const updateTimers = new Map<string, NodeJS.Timeout>();
+onDocumentClosed(key => {
+    const pending = updateTimers.get(key);
+    if (pending) {clearTimeout(pending);}
+    updateTimers.delete(key);
+});
 
 /**
  * 문서 수정 이벤트 핸들러
@@ -33,10 +38,13 @@ export default function onTextDocumentChange(event: vscode.TextDocumentChangeEve
     // 🌟 350ms 동안 추가 입력이 없을 때 딱 한 번만 완벽하게 동기화 처리
     updateTimers.set(timerKey, setTimeout(() => {
         updateTimers.delete(timerKey);
+        // 예약 시점의 문서 객체가 아니라 지금 열려 있는 문서를 쓴다 (닫혔으면 아무것도 하지 않음)
+        const current = findOpenDocument(timerKey);
+        if (!current) {return;}
         // 1. 텍스트 파싱 업데이트 (타이머 내부로 안전하게 이식)
         const skDocument = Skript.find(fsPath);
         if (skDocument) {
-            skDocument.update(document.getText());
+            skDocument.update(current.getText());
             log.debug(`문서 갱신: ${document.fileName}`);
         } else {
             log.debug(`문서 갱신 건너뜀 (스캔되지 않은 문서): ${document.fileName}`);
@@ -46,7 +54,7 @@ export default function onTextDocumentChange(event: vscode.TextDocumentChangeEve
         SYMBOLS_MAP.delete(fsPath);
         
         // 3. 진단 (갱신된 모델 기준으로 바로 계산)
-        scheduleDiagnostics(document, 0);
+        scheduleDiagnostics(current, 0);
     }, 350));
 
     // 🌟 [최적화 핵심 2] 불필요한 for 루프를 완전히 제거하고, 유저가 방금 입력한 마지막 이벤트(O(1))만 저격하여 
